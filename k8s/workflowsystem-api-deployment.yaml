@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflowsystem-api
+  namespace: workflowsystem
+  labels:
+    app: workflowsystem-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: workflowsystem-api
+  template:
+    metadata:
+      labels:
+        app: workflowsystem-api
+    spec:
+      containers:
+      - name: workflowsystem-api
+        image: workflowsystem-api:latest
+        ports:
+        - containerPort: 5777
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            secretKeyRef:
+              name: workflowsystem-db-secret
+              key: connection-string
+        - name: ConnectionStrings__ReadOnlyConnection
+          valueFrom:
+            secretKeyRef:
+              name: workflowsystem-db-secret
+              key: readonly-connection-string
+        - name: ConnectionStrings__Redis
+          valueFrom:
+            secretKeyRef:
+              name: workflowsystem-redis-secret
+              key: connection-string
+        - name: Kubernetes__PodName
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: Kubernetes__Namespace
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5777
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5777
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflowsystem-api-service
+  namespace: workflowsystem
+spec:
+  selector:
+    app: workflowsystem-api
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 5777
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: workflowsystem-api-ingress
+  namespace: workflowsystem
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: api.workflowsystem.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: workflowsystem-api-service
+            port:
+              number: 80 

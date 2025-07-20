@@ -1,0 +1,12 @@
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.csproj.AssemblyReference.cache
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.AssemblyInfoInputs.cache
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.AssemblyInfo.cs
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.csproj.CoreCompileInputs.cache
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/bin/Debug/net8.0/WorkflowSystem.Domain.deps.json
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/bin/Debug/net8.0/WorkflowSystem.Domain.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/bin/Debug/net8.0/WorkflowSystem.Domain.pdb
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/refint/WorkflowSystem.Domain.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.pdb
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/ref/WorkflowSystem.Domain.dll

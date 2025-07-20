@@ -1,0 +1,15 @@
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.csproj.AssemblyReference.cache
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.AssemblyInfoInputs.cache
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.AssemblyInfo.cs
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.csproj.CoreCompileInputs.cache
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/bin/Debug/net8.0/WorkflowSystem.Application.deps.json
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/bin/Debug/net8.0/WorkflowSystem.Application.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/bin/Debug/net8.0/WorkflowSystem.Application.pdb
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/bin/Debug/net8.0/WorkflowSystem.Domain.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/bin/Debug/net8.0/WorkflowSystem.Domain.pdb
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/Workflow.BFC91CAD.Up2Date
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/refint/WorkflowSystem.Application.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.pdb
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/ref/WorkflowSystem.Application.dll

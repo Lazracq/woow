@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "6u/kJbBmiyc=",
+  "success": true,
+  "projectFilePath": "/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/WorkflowSystem.Domain.csproj",
+  "expectedPackageFiles": [
+    "/Users/zinebbouayad/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.0/microsoft.extensions.dependencyinjection.abstractions.8.0.0.nupkg.sha512",
+    "/Users/zinebbouayad/.nuget/packages/system.componentmodel.annotations/5.0.0/system.componentmodel.annotations.5.0.0.nupkg.sha512",
+    "/Users/zinebbouayad/.nuget/packages/microsoft.netcore.app.ref/8.0.17/microsoft.netcore.app.ref.8.0.17.nupkg.sha512",
+    "/Users/zinebbouayad/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.17/microsoft.aspnetcore.app.ref.8.0.17.nupkg.sha512"
+  ],
+  "logs": []
+}
