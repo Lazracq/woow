@@ -141,15 +141,15 @@ namespace WorkflowSystem.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
-                    b.Property<int>("PositionX")
+                    b.Property<double>("PositionX")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.0);
 
-                    b.Property<int>("PositionY")
+                    b.Property<double>("PositionY")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("double precision")
+                        .HasDefaultValue(0.0);
 
                     b.Property<string>("Type")
                         .IsRequired()

@@ -55,7 +55,6 @@ public class RealTimeCollaborationService : IRealTimeCollaborationService
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<RealTimeCollaborationService> _logger;
-    private readonly string _presencePrefix = "collaboration:presence:";
     private readonly string _eventsPrefix = "collaboration:events:";
     private readonly string _statePrefix = "collaboration:state:";
     private readonly string _workflowUsersPrefix = "collaboration:workflow:users:";

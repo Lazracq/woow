@@ -45,6 +45,7 @@ public static class TaskStrategyExtensions
         // Register all task strategies
         services.AddScoped<ITaskStrategy, HttpCalloutTaskStrategy>();
         services.AddScoped<ITaskStrategy, ScriptExecutionTaskStrategy>();
+        services.AddScoped<ITaskStrategy, DelayTaskStrategy>();
         // Add more strategies here as they are implemented
         
         // Register the factory

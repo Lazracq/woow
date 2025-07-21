@@ -62,6 +62,7 @@ public class WorkflowExecutionJob : IJob
     {
         // This would typically update the trigger's last execution time
         // For now, we'll just log it
+        await System.Threading.Tasks.Task.Delay(1); // Add minimal async operation
         _logger.LogInformation("Trigger {TriggerId} last executed at {ExecutionTime}", triggerId, executionTime);
     }
 }

@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using WorkflowSystem.Application.Workflows.Queries.GetWorkflows;
 using WorkflowSystem.Application.Workflows.Commands.CreateWorkflow;
+using WorkflowSystem.Application.Workflows.Queries.GetWorkflowById;
+using WorkflowSystem.Application.Workflows.Queries.GetWorkflowNodes;
+using WorkflowSystem.Application.Workflows.Commands.UpdateWorkflowNode;
+using WorkflowSystem.Application.Workflows.Commands.CreateWorkflowNode;
 
 namespace WorkflowSystem.API.Controllers
 {
@@ -40,58 +44,6 @@ namespace WorkflowSystem.API.Controllers
             }
             catch (Exception ex)
             {
-                // Check if it's a database-related error
-                if (ex.Message.Contains("relation") || 
-                    ex.Message.Contains("does not exist") ||
-                    ex.InnerException?.Message?.Contains("relation") == true ||
-                    ex.InnerException?.Message?.Contains("does not exist") == true)
-                {
-                    // Return sample data when database is not set up
-                    var sampleWorkflows = new[]
-                    {
-                        new
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Name = "Data Processing Pipeline",
-                            Description = "Automated data processing and transformation workflow",
-                            IsActive = true,
-                            Status = "Active",
-                            CreatedAt = DateTime.UtcNow.AddDays(-5),
-                            UpdatedAt = DateTime.UtcNow.AddDays(-1),
-                            TaskCount = 8,
-                            ExecutionCount = 156,
-                            AvgDuration = 1.2,
-                            SuccessRate = 94.2,
-                            LastRun = "2 minutes ago",
-                            NextRun = "in 5 minutes",
-                            Tags = new[] { "data", "processing", "automation" },
-                            Priority = "High",
-                            Complexity = "Medium"
-                        },
-                        new
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            Name = "Email Notification System",
-                            Description = "Sends automated email notifications based on events",
-                            IsActive = true,
-                            Status = "Active",
-                            CreatedAt = DateTime.UtcNow.AddDays(-10),
-                            UpdatedAt = DateTime.UtcNow.AddDays(-2),
-                            TaskCount = 5,
-                            ExecutionCount = 89,
-                            AvgDuration = 0.8,
-                            SuccessRate = 98.1,
-                            LastRun = "5 minutes ago",
-                            NextRun = "in 10 minutes",
-                            Tags = new[] { "email", "notifications", "events" },
-                            Priority = "Medium",
-                            Complexity = "Low"
-                        }
-                    };
-
-                    return Ok(sampleWorkflows);
-                }
-
                 return StatusCode(500, new { error = "Failed to retrieve workflows", message = ex.Message });
             }
         }
@@ -101,28 +53,18 @@ namespace WorkflowSystem.API.Controllers
         {
             try
             {
-                // For now, return a sample workflow since we don't have GetWorkflowByIdQuery
-                var sampleWorkflow = new
+                if (!Guid.TryParse(id, out var workflowId))
                 {
-                    Id = id,
-                    Name = "Sample Workflow",
-                    Description = "This is a sample workflow",
-                    IsActive = true,
-                    Status = "Active",
-                    CreatedAt = DateTime.UtcNow.AddDays(-5),
-                    UpdatedAt = DateTime.UtcNow.AddDays(-1),
-                    TaskCount = 5,
-                    ExecutionCount = 100,
-                    AvgDuration = 1.5,
-                    SuccessRate = 95.0,
-                    LastRun = "1 hour ago",
-                    NextRun = "in 2 hours",
-                    Tags = new[] { "sample", "test" },
-                    Priority = "Medium",
-                    Complexity = "Low"
-                };
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
 
-                return Ok(sampleWorkflow);
+                var query = new GetWorkflowByIdQuery { Id = workflowId };
+                var result = await _mediator.Send(query);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { error = ex.Message });
             }
             catch (Exception ex)
             {
@@ -193,10 +135,12 @@ namespace WorkflowSystem.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateWorkflow(string id, [FromBody] object request)
         {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
             try
             {
-                // For now, return success since we don't have UpdateWorkflowCommand
-                return Ok(new { message = "Workflow updated successfully", id });
+                // TODO: Implement UpdateWorkflowCommand
+                return StatusCode(501, new { error = "UpdateWorkflow not implemented yet" });
             }
             catch (Exception ex)
             {
@@ -207,15 +151,115 @@ namespace WorkflowSystem.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWorkflow(string id)
         {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
             try
             {
-                // For now, return success since we don't have DeleteWorkflowCommand
-                return Ok(new { message = "Workflow deleted successfully", id });
+                // TODO: Implement DeleteWorkflowCommand
+                return StatusCode(501, new { error = "DeleteWorkflow not implemented yet" });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = "Failed to delete workflow", message = ex.Message });
             }
         }
+
+        // Workflow Nodes endpoints
+        [HttpGet("{workflowId}/nodes")]
+        public async Task<IActionResult> GetWorkflowNodes(string workflowId)
+        {
+            try
+            {
+                if (!Guid.TryParse(workflowId, out var workflowGuid))
+                {
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
+
+                var query = new GetWorkflowNodesQuery { WorkflowId = workflowGuid };
+                var result = await _mediator.Send(query);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to retrieve workflow nodes", message = ex.Message });
+            }
+        }
+
+        [HttpPost("{workflowId}/nodes")]
+        public async Task<IActionResult> CreateWorkflowNode(string workflowId, [FromBody] CreateWorkflowNodeCommand command)
+        {
+            try
+            {
+                if (!Guid.TryParse(workflowId, out var workflowGuid))
+                {
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
+
+                command.WorkflowId = workflowGuid;
+                var result = await _mediator.Send(command);
+                return CreatedAtAction(nameof(GetWorkflowNodes), new { workflowId = workflowGuid }, result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to create workflow node", message = ex.Message });
+            }
+        }
+
+        [HttpPut("{workflowId}/nodes/{nodeId}")]
+        public async Task<IActionResult> UpdateWorkflowNode(string workflowId, string nodeId, [FromBody] UpdateWorkflowNodeRequest request)
+        {
+            try
+            {
+                if (!Guid.TryParse(workflowId, out var workflowGuid))
+                {
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
+
+                if (!Guid.TryParse(nodeId, out var nodeGuid))
+                {
+                    return BadRequest(new { error = "Invalid node ID format" });
+                }
+
+                var command = new UpdateWorkflowNodeCommand
+                {
+                    WorkflowId = workflowGuid,
+                    NodeId = nodeGuid,
+                    PositionX = request.Position?.X,
+                    PositionY = request.Position?.Y,
+                    Name = request.Name,
+                    Type = request.Type,
+                    Configuration = request.Configuration,
+                    IsActive = request.IsActive,
+                    Connections = request.Connections
+                };
+
+                var result = await _mediator.Send(command);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to update workflow node", message = ex.Message });
+            }
+        }
+    }
+
+    public class UpdateWorkflowNodeRequest
+    {
+        public Position? Position { get; set; }
+        public string? Name { get; set; }
+        public string? Type { get; set; }
+        public string? Configuration { get; set; }
+        public bool? IsActive { get; set; }
+        public List<string>? Connections { get; set; }
+    }
+
+    public class Position
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
     }
 } 

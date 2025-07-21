@@ -86,8 +86,7 @@ public class Workflow : BaseEntity
 
     public void RemoveTask(Task task)
     {
-        if (task == null)
-            throw new ArgumentNullException(nameof(task));
+        ArgumentNullException.ThrowIfNull(task);
 
         Tasks.Remove(task);
         UpdatedAt = DateTime.UtcNow;

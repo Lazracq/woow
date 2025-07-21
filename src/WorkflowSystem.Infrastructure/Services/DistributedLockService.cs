@@ -1,6 +1,7 @@
-using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Task = WorkflowSystem.Domain.Entities.Task;
 
 namespace WorkflowSystem.Infrastructure.Services;
@@ -121,7 +122,8 @@ public class DistributedLockService : IDistributedLockService
         var lockKey = $"{_lockPrefix}{resourceId}";
         var db = _redis.GetDatabase();
         
-        var distributedLock = new RedisDistributedLock(db, lockKey, timeout, _logger as ILogger<RedisDistributedLock>);
+        var distributedLock = new RedisDistributedLock(db, lockKey, timeout, _logger as ILogger<RedisDistributedLock> ?? 
+            NullLogger<RedisDistributedLock>.Instance);
         var acquired = await distributedLock.AcquireAsync();
         
         if (acquired)

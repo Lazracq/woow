@@ -6,6 +6,7 @@ namespace WorkflowSystem.Application.Common.Interfaces;
 public interface IExecutionRepository
 {
     Task<Execution?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Execution>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IEnumerable<Execution>> GetByWorkflowIdAsync(Guid workflowId, CancellationToken cancellationToken = default);
     Task<IEnumerable<Execution>> GetByStatusAsync(ExecutionStatus status, CancellationToken cancellationToken = default);
     Task<IEnumerable<Execution>> GetActiveExecutionsAsync(CancellationToken cancellationToken = default);

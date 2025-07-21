@@ -64,7 +64,6 @@ public class PerformanceMonitoringService : IPerformanceMonitoringService
     private readonly string _metricsPrefix = "metrics:";
     private readonly string _executionsKey = "metrics:executions";
     private readonly string _cacheMetricsKey = "metrics:cache";
-    private readonly string _performanceKey = "metrics:performance";
 
     public PerformanceMonitoringService(
         IConnectionMultiplexer redis,

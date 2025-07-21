@@ -11,6 +11,8 @@ namespace WorkflowSystem.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetWorkflowStats()
         {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
             // For now, return sample data
             var stats = new
             {

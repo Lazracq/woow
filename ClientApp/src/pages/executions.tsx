@@ -1,76 +1,36 @@
 import { motion } from 'framer-motion'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
   PlayCircle, 
   Search, 
-  Filter, 
   MoreVertical,
   Eye,
   Download,
   RefreshCw,
-  Sparkles,
   Clock,
   CheckCircle,
   XCircle,
   AlertCircle,
-  Activity,
-  Timer,
-  TrendingUp
+  Loader2,
+  Filter,
+  BarChart3
 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { apiService, Execution } from '@/services/api'
+import { useToast } from '@/hooks/use-toast'
 
 export function Executions() {
-  const executions = [
-    {
-      id: '1',
-      workflow: 'Data Processing Pipeline',
-      status: 'completed',
-      startedAt: '2024-01-15 10:30:00',
-      completedAt: '2024-01-15 10:31:12',
-      duration: '1m 12s',
-      progress: 100,
-      result: 'success',
-      logs: 'Processing completed successfully',
-      tags: ['data', 'processing']
-    },
-    {
-      id: '2',
-      workflow: 'Email Notification System',
-      status: 'running',
-      startedAt: '2024-01-15 10:25:00',
-      completedAt: null,
-      duration: '5m 30s',
-      progress: 65,
-      result: null,
-      logs: 'Sending notifications to 150 recipients...',
-      tags: ['email', 'notifications']
-    },
-    {
-      id: '3',
-      workflow: 'Report Generation',
-      status: 'failed',
-      startedAt: '2024-01-15 10:20:00',
-      completedAt: '2024-01-15 10:23:15',
-      duration: '3m 15s',
-      progress: 0,
-      result: 'error',
-      logs: 'Database connection timeout',
-      tags: ['reports', 'analytics']
-    },
-    {
-      id: '4',
-      workflow: 'Backup System',
-      status: 'completed',
-      startedAt: '2024-01-15 10:00:00',
-      completedAt: '2024-01-15 10:45:30',
-      duration: '45m 30s',
-      progress: 100,
-      result: 'success',
-      logs: 'Backup completed: 2.3GB saved',
-      tags: ['backup', 'database']
-    }
-  ]
+  const [executions, setExecutions] = useState<Execution[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const { toast } = useToast()
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -92,6 +52,90 @@ export function Executions() {
       }
     }
   }
+
+  const fetchExecutions = useCallback(async () => {
+    try {
+      setLoading(true)
+      const response = await apiService.getExecutions(
+        currentPage, 
+        10, 
+        statusFilter || undefined
+      )
+      setExecutions(response.executions)
+      setTotalPages(response.totalPages)
+      setTotalCount(response.totalCount)
+    } catch (error) {
+      console.error('Failed to fetch executions:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load executions. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [currentPage, statusFilter, toast])
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await fetchExecutions()
+    setRefreshing(false)
+    toast({
+      title: "Success",
+      description: "Executions data refreshed successfully.",
+    })
+  }, [fetchExecutions, toast])
+
+  const handleSearch = useCallback(() => {
+    // Reset to first page when searching
+    setCurrentPage(1)
+    fetchExecutions()
+  }, [fetchExecutions])
+
+  const handleStatusFilter = useCallback((status: string) => {
+    setStatusFilter(status)
+    setCurrentPage(1)
+  }, [])
+
+  const handleCancelExecution = useCallback(async (id: string) => {
+    try {
+      await apiService.cancelExecution(id)
+      toast({
+        title: "Success",
+        description: "Execution cancelled successfully.",
+      })
+      fetchExecutions() // Refresh the list
+    } catch (error) {
+      console.error('Failed to cancel execution:', error)
+      toast({
+        title: "Error",
+        description: "Failed to cancel execution. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }, [fetchExecutions, toast])
+
+  const handleRetryExecution = useCallback(async (id: string) => {
+    try {
+      await apiService.retryExecution(id)
+      toast({
+        title: "Success",
+        description: "Execution retry initiated successfully.",
+      })
+      fetchExecutions() // Refresh the list
+    } catch (error) {
+      console.error('Failed to retry execution:', error)
+      toast({
+        title: "Error",
+        description: "Failed to retry execution. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }, [fetchExecutions, toast])
+
+  useEffect(() => {
+    fetchExecutions()
+  }, [fetchExecutions])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -121,6 +165,26 @@ export function Executions() {
     }
   }
 
+  const formatDuration = (duration: string) => {
+    // Convert backend duration format to display format
+    return duration
+  }
+
+  const formatDateTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleString()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span className="text-lg">Loading executions...</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <motion.div 
       className="space-y-6"
@@ -128,197 +192,202 @@ export function Executions() {
       initial="hidden"
       animate="visible"
     >
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-woow-blue to-woow-magenta rounded-xl flex items-center justify-center shadow-woow">
-            <PlayCircle className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-woow-blue to-woow-magenta bg-clip-text text-transparent">
-              Executions Z22
-            </h1>
-            <p className="text-muted-foreground">
-              Monitor and manage workflow executions in real-time.
-            </p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Stats */}
-      <motion.div 
-        className="grid gap-4 md:grid-cols-4"
-        variants={containerVariants}
-      >
-        <motion.div variants={itemVariants}>
-          <Card className="border-woow-blue/20">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-woow-blue/10">
-                  <Activity className="h-4 w-4 text-woow-blue" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Executions</p>
-                  <p className="text-2xl font-bold">1,247</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="border-woow-blue/20">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-woow-lime/10">
-                  <CheckCircle className="h-4 w-4 text-woow-lime" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Successful</p>
-                  <p className="text-2xl font-bold">1,156</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="border-woow-blue/20">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-woow-amber/10">
-                  <Timer className="h-4 w-4 text-woow-amber" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Avg Duration</p>
-                  <p className="text-2xl font-bold">2.3s</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="border-woow-blue/20">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-2">
-                <div className="p-2 rounded-lg bg-woow-magenta/10">
-                  <TrendingUp className="h-4 w-4 text-woow-magenta" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                  <p className="text-2xl font-bold">92.7%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </motion.div>
-
       {/* Search and Filters */}
-      <motion.div variants={itemVariants}>
-        <Card className="border-woow-blue/20">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search executions..."
-                  className="w-full pl-10 pr-4 py-2 border border-woow-blue/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-woow-blue/20"
-                />
-              </div>
-              <Button variant="outline" className="border-woow-blue/20 hover:bg-woow-blue/5">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-              <Button variant="outline" className="border-woow-blue/20 hover:bg-woow-blue/5">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search executions..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+            className="w-full pl-10 pr-4 py-2 border border-woow-blue/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-woow-blue/20"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-woow-blue/20 hover:bg-woow-blue/5"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Refresh
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="border-woow-blue/20 hover:bg-woow-blue/5"
+            asChild
+          >
+            <select
+              value={statusFilter}
+              onChange={(e) => handleStatusFilter(e.target.value)}
+              className="h-9 px-3 py-1 text-sm bg-transparent border-0 focus:outline-none focus:ring-0"
+            >
+              <option value="">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="running">Running</option>
+              <option value="failed">Failed</option>
+              <option value="pending">Pending</option>
+            </select>
+          </Button>
+          <Button variant="outline" size="sm" className="border-woow-blue/20 dark:border-woow-blue-400/20">
+            <Filter className="h-4 w-4 mr-2" />
+            Filter
+          </Button>
+          <Button variant="outline" size="sm" className="border-woow-blue/20 dark:border-woow-blue-400/20">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Analytics
+          </Button>
+        </div>
       </motion.div>
 
       {/* Executions List */}
       <motion.div 
-        className="grid gap-4"
+        className="grid gap-3"
         variants={containerVariants}
       >
-        {executions.map((execution, index) => (
-          <motion.div key={execution.id} variants={itemVariants}>
-            <Card className="border-woow-blue/20 hover:shadow-lg transition-all duration-300 group">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-semibold">{execution.workflow}</h3>
-                      {getStatusBadge(execution.status)}
-                      {execution.result && getResultIcon(execution.result)}
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Started</p>
-                        <p className="text-sm font-medium">{execution.startedAt}</p>
+        {executions.length === 0 ? (
+          <Card className="border-woow-blue/20">
+            <CardContent className="p-8 text-center">
+              <PlayCircle className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <h3 className="text-lg font-semibold mb-2">No executions found</h3>
+              <p className="text-muted-foreground">
+                {searchTerm || statusFilter 
+                  ? "Try adjusting your search or filter criteria."
+                  : "No executions have been created yet."
+                }
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          executions.map((execution, index) => (
+            <motion.div key={execution.id} variants={itemVariants}>
+              <Card className="border-woow-blue/20 hover:shadow-lg transition-all duration-300 group">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-3">
+                        <h3 className="text-base font-semibold">{execution.workflow}</h3>
+                        {getStatusBadge(execution.status)}
+                        {execution.result && getResultIcon(execution.result)}
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Duration</p>
-                        <p className="text-sm font-medium">{execution.duration}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Progress</p>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-full bg-muted rounded-full h-1">
-                            <motion.div 
-                              className="bg-woow-blue h-1 rounded-full"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${execution.progress}%` }}
-                              transition={{ duration: 1, delay: index * 0.1 }}
-                            />
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Started</p>
+                          <p className="text-sm font-medium">{formatDateTime(execution.startedAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Duration</p>
+                          <p className="text-sm font-medium">{formatDuration(execution.duration)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Progress</p>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-full bg-muted rounded-full h-1">
+                              <motion.div 
+                                className="bg-woow-blue h-1 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${execution.progress}%` }}
+                                transition={{ duration: 1, delay: index * 0.1 }}
+                              />
+                            </div>
+                            <span className="text-xs">{execution.progress}%</span>
                           </div>
-                          <span className="text-xs">{execution.progress}%</span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Result</p>
+                          <p className="text-sm font-medium capitalize">{execution.result || 'Running'}</p>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Result</p>
-                        <p className="text-sm font-medium capitalize">{execution.result || 'Running'}</p>
+
+                      <div className="mb-3">
+                        <p className="text-xs text-muted-foreground mb-1">Latest Log</p>
+                        <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                          {execution.logs}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {execution.tags.map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs border-woow-blue/20 text-woow-blue">
+                            {tag}
+                          </Badge>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="mb-4">
-                      <p className="text-xs text-muted-foreground mb-1">Latest Log</p>
-                      <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-                        {execution.logs}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {execution.tags.map((tag) => (
-                        <Badge key={tag} variant="outline" className="text-xs border-woow-blue/20 text-woow-blue">
-                          {tag}
-                        </Badge>
-                      ))}
+                    <div className="flex items-center space-x-1 ml-3">
+                      <Button size="sm" variant="ghost" className="hover:bg-woow-blue/10 h-8 w-8 p-0">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" className="hover:bg-woow-blue/10 h-8 w-8 p-0">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      {execution.status === 'running' && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="hover:bg-woow-pink/10 text-woow-pink h-8 w-8 p-0"
+                          onClick={() => handleCancelExecution(execution.id)}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {execution.status === 'failed' && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="hover:bg-woow-lime/10 text-woow-lime h-8 w-8 p-0"
+                          onClick={() => handleRetryExecution(execution.id)}
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="hover:bg-woow-blue/10 h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="flex items-center space-x-2 ml-4">
-                    <Button size="sm" variant="ghost" className="hover:bg-woow-blue/10">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="hover:bg-woow-blue/10">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" className="hover:bg-woow-blue/10">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))
+        )}
       </motion.div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <motion.div variants={itemVariants} className="flex items-center justify-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages} ({totalCount} total)
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+        </motion.div>
+      )}
     </motion.div>
   )
 } 

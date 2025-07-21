@@ -106,7 +106,7 @@ public class ReadOnlyWorkflowRepository : IReadOnlyWorkflowRepository
             .Include(w => w.Tasks)
             .Include(w => w.Variables)
             .Include(w => w.Triggers)
-            .Where(w => w.Name.Contains(searchTerm) || w.Description.Contains(searchTerm))
+            .Where(w => w.Name.Contains(searchTerm) || (w.Description != null && w.Description.Contains(searchTerm)))
             .OrderByDescending(w => w.CreatedAt)
             .ToListAsync(cancellationToken);
     }

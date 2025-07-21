@@ -4,21 +4,71 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { 
-  Database, 
   Server, 
-  Settings as SettingsIcon,
+  Variable,
   Save,
-  RefreshCw,
-  AlertTriangle
+  Plus,
+  X
 } from 'lucide-react'
+import { useState } from 'react'
+
+interface GlobalVariable {
+  id: string
+  name: string
+  value: string
+  type: 'Global' | 'System'
+}
 
 export function Settings() {
+  const [variables, setVariables] = useState<GlobalVariable[]>([])
+  const [newVariable, setNewVariable] = useState({
+    name: '',
+    value: '',
+    type: 'Global' as 'Global' | 'System'
+  })
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  const handleAddVariable = () => {
+    if (!newVariable.name.trim() || !newVariable.value.trim()) {
+      setError('Variable name and value are required')
+      return
+    }
+
+    if (variables.some(v => v.name === newVariable.name)) {
+      setError('Variable name already exists')
+      return
+    }
+
+    const variable: GlobalVariable = {
+      id: Date.now().toString(),
+      name: newVariable.name.trim(),
+      value: newVariable.value.trim(),
+      type: newVariable.type
+    }
+
+    setVariables(prev => [...prev, variable])
+    setNewVariable({ name: '', value: '', type: 'Global' })
+    setError(null)
+    setSuccess('Variable added successfully!')
+  }
+
+  const handleRemoveVariable = (id: string) => {
+    setVariables(prev => prev.filter(v => v.id !== id))
+    setSuccess('Variable removed successfully!')
+  }
+
+  const handleSaveVariables = () => {
+    // In a real app, you would call the API here to save global variables
+    setSuccess('Global variables saved successfully!')
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
-          Configure your workflow system settings and connections.
+          Configure your workflow system settings and global variables.
         </p>
       </div>
 
@@ -40,7 +90,7 @@ export function Settings() {
                 <div className="h-2 w-2 rounded-full bg-green-500" />
                 <div>
                   <p className="font-medium">API Service</p>
-                  <p className="text-sm text-muted-foreground">Running on port 5000</p>
+                  <p className="text-sm text-muted-foreground">Running on port 5776</p>
                 </div>
               </div>
               <Badge variant="default" className="bg-green-500">Healthy</Badge>
@@ -82,179 +132,121 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      {/* Database Configuration */}
+      {/* Global Variables */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Database className="h-5 w-5" />
-            <span>Database Configuration</span>
+            <Variable className="h-5 w-5" />
+            <span>Global Variables</span>
           </CardTitle>
           <CardDescription>
-            Configure database connections for primary and read-replica
+            Manage global and system variables that are available across all workflows
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="primary-db">Primary Database</Label>
-              <Input
-                id="primary-db"
-                placeholder="Host=primary-db;Database=workflows;Username=app;Password=secret"
-                defaultValue="Host=primary-db;Database=workflows;Username=app;Password=secret"
-              />
+        <CardContent className="space-y-6">
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{error}</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="replica-db">Read-Replica Database</Label>
-              <Input
-                id="replica-db"
-                placeholder="Host=replica-db;Database=workflows;Username=app;Password=secret"
-                defaultValue="Host=replica-db;Database=workflows;Username=app;Password=secret"
-              />
+          )}
+          {success && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-600">{success}</p>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button>
-              <Save className="mr-2 h-4 w-4" />
-              Save Configuration
-            </Button>
-            <Button variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Test Connection
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
 
-      {/* Redis Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Server className="h-5 w-5" />
-            <span>Redis Configuration</span>
-          </CardTitle>
-          <CardDescription>
-            Configure Redis connection for queuing and caching
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="redis-url">Redis Connection String</Label>
-            <Input
-              id="redis-url"
-              placeholder="localhost:6379"
-              defaultValue="localhost:6379"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button>
-              <Save className="mr-2 h-4 w-4" />
-              Save Configuration
+          {/* Add New Variable */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Variable Name</Label>
+                <Input
+                  value={newVariable.name}
+                  onChange={(e) => setNewVariable(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g., API_BASE_URL"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Value</Label>
+                <Input
+                  value={newVariable.value}
+                  onChange={(e) => setNewVariable(prev => ({ ...prev, value: e.target.value }))}
+                  placeholder="e.g., https://api.example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <select
+                  value={newVariable.type}
+                  onChange={(e) => setNewVariable(prev => ({ ...prev, type: e.target.value as 'Global' | 'System' }))}
+                  className="w-full p-2 rounded-md border border-input bg-background"
+                >
+                  <option value="Global">Global</option>
+                  <option value="System">System</option>
+                </select>
+              </div>
+            </div>
+            <Button 
+              onClick={handleAddVariable}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Variable
             </Button>
-            <Button variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Test Connection
-            </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Worker Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <SettingsIcon className="h-5 w-5" />
-            <span>Worker Configuration</span>
-          </CardTitle>
-          <CardDescription>
-            Configure worker service settings and scaling parameters
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="max-workers">Max Workers</Label>
-              <Input
-                id="max-workers"
-                type="number"
-                defaultValue="10"
-                min="1"
-                max="50"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="queue-timeout">Queue Timeout (seconds)</Label>
-              <Input
-                id="queue-timeout"
-                type="number"
-                defaultValue="300"
-                min="60"
-                max="3600"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="retry-attempts">Retry Attempts</Label>
-              <Input
-                id="retry-attempts"
-                type="number"
-                defaultValue="3"
-                min="0"
-                max="10"
-              />
-            </div>
+          {/* Variables List */}
+          <div className="space-y-3">
+            <h4 className="font-medium">Current Variables</h4>
+            {variables.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No global variables defined yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {variables.map((variable) => (
+                  <div
+                    key={variable.id}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium">{variable.name}</span>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            variable.type === 'System' 
+                              ? 'border-blue-200 text-blue-600'
+                              : 'border-gray-200 text-gray-600'
+                          }`}
+                        >
+                          {variable.type}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">{variable.value}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveVariable(variable.id)}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="flex items-center space-x-2">
-            <Button>
-              <Save className="mr-2 h-4 w-4" />
-              Save Configuration
-            </Button>
-            <Button variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Restart Workers
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* System Alerts */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <AlertTriangle className="h-5 w-5" />
-            <span>System Alerts</span>
-          </CardTitle>
-          <CardDescription>
-            Configure alert thresholds and notifications
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="queue-alert">Queue Length Alert</Label>
-              <Input
-                id="queue-alert"
-                type="number"
-                defaultValue="100"
-                placeholder="Alert when queue length exceeds"
-              />
+          {/* Save Button */}
+          {variables.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <Button onClick={handleSaveVariables}>
+                <Save className="mr-2 h-4 w-4" />
+                Save Global Variables
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="error-rate-alert">Error Rate Alert (%)</Label>
-              <Input
-                id="error-rate-alert"
-                type="number"
-                defaultValue="5"
-                min="0"
-                max="100"
-                placeholder="Alert when error rate exceeds"
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button>
-              <Save className="mr-2 h-4 w-4" />
-              Save Alerts
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

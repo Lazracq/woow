@@ -22,6 +22,15 @@ public class ExecutionRepository : IExecutionRepository
             .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
     }
 
+    public async Task<IEnumerable<Execution>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Executions
+            .Include(e => e.ExecutionSteps)
+            .Include(e => e.Workflow)
+            .OrderByDescending(e => e.StartedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<Execution>> GetByWorkflowIdAsync(Guid workflowId, CancellationToken cancellationToken = default)
     {
         return await _context.Executions

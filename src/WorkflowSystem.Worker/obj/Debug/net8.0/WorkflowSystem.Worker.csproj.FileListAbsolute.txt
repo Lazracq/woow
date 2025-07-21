@@ -132,3 +132,8 @@
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/obj/Debug/net8.0/WorkflowSystem.Worker.pdb
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/obj/Debug/net8.0/WorkflowSystem.Worker.genruntimeconfig.cache
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/obj/Debug/net8.0/ref/WorkflowSystem.Worker.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/bin/Debug/net8.0/Quartz.Jobs.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/bin/Debug/net8.0/Quartz.Plugins.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/bin/Debug/net8.0/Quartz.Plugins.TimeZoneConverter.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/bin/Debug/net8.0/TimeZoneConverter.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Worker/obj/Debug/net8.0/WorkflowSystem.Worker.sourcelink.json

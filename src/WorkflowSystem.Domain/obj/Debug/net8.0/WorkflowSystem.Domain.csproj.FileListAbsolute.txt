@@ -10,3 +10,4 @@
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/refint/WorkflowSystem.Domain.dll
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.pdb
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/ref/WorkflowSystem.Domain.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Domain/obj/Debug/net8.0/WorkflowSystem.Domain.sourcelink.json

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   LayoutDashboard, 
@@ -18,7 +18,8 @@ import {
   CheckCircle,
   AlertCircle,
   XCircle,
-  Zap
+  Zap,
+  Home
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from './theme-provider'
@@ -30,8 +31,14 @@ interface LayoutProps {
 
 const navigation = [
   { 
-    name: 'Dashboard', 
+    name: 'Home', 
     href: '/', 
+    icon: Home,
+    description: 'Welcome page'
+  },
+  { 
+    name: 'Dashboard', 
+    href: '/dashboard', 
     icon: LayoutDashboard,
     description: 'Overview and analytics'
   },
@@ -67,7 +74,9 @@ export function Layout({ children }: LayoutProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState('en')
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [workflowName, setWorkflowName] = useState<string | null>(null)
   const location = useLocation()
+  const params = useParams()
   const { theme, setTheme } = useTheme()
 
   const currentTime = new Date().toLocaleTimeString('en-US', {
@@ -102,6 +111,24 @@ export function Layout({ children }: LayoutProps) {
       // signalRService.disconnect()
     }
   }, [])
+
+  // Load workflow name for breadcrumb
+  useEffect(() => {
+    const loadWorkflowName = async () => {
+      if (location.pathname.includes('/workflows/') && location.pathname.includes('/edit') && params.id) {
+        try {
+          const workflow = await apiService.getWorkflowById(params.id)
+          setWorkflowName(workflow.name)
+        } catch (error) {
+          console.error('Failed to load workflow name:', error)
+        }
+      } else {
+        setWorkflowName(null)
+      }
+    }
+
+    loadWorkflowName()
+  }, [location.pathname, params.id])
 
   const loadNotifications = async () => {
     try {
@@ -153,38 +180,39 @@ export function Layout({ children }: LayoutProps) {
       <div className="relative z-10 flex h-screen">
         {/* Sidebar */}
         <div className={`hidden lg:flex lg:flex-col transition-all duration-300 ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-80'}`}>
-          <div className="flex flex-col flex-grow bg-gradient-to-b from-blue-50/95 via-blue-100/95 to-blue-200/95 dark:from-slate-800/95 dark:via-slate-900/95 dark:to-slate-950/95 backdrop-blur-xl border-r border-blue-200/40 dark:border-slate-600/40 shadow-2xl">
+          <div className="flex flex-col flex-grow backdrop-blur-xl border-r border-slate-600/40 dark:border-slate-600/40 shadow-2xl relative">
+            {/* Light mode background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-50/95 via-indigo-50/95 to-purple-50/95 dark:hidden" style={{
+              background: 'linear-gradient(152deg, rgba(14, 40, 61, 1) 0%, rgba(104, 158, 190, 1) 100%)',
+              backgroundColor: 'rgb(22, 49, 70)'
+            }} />
+            {/* Dark mode background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-800/95 via-slate-900/95 to-slate-950/95 hidden dark:block" />
+            
             {/* Logo Section at Top */}
-            <div className="flex h-16 items-center justify-center px-4 border-b border-blue-200/40 dark:border-slate-600/40">
+            <div className="flex h-16 items-center justify-center px-4 border-b border-slate-200/40 dark:border-slate-600/40 relative z-10">
               <div className="relative">
                 {sidebarCollapsed ? (
                   // Collapsed sidebar - use ico file
                   <img 
                     src="/logoW.ico" 
                     alt="WooWStudio" 
-                    className="relative w-8 h-8 filter dark:brightness-75 dark:contrast-125"
+                    className="relative w-8 h-8 filter brightness-0 invert dark:brightness-75 dark:contrast-125 dark:invert-0"
                     onError={(e) => {
                       // Fallback to the original logo if ico doesn't exist
                       e.currentTarget.src = '/WooWStudioGoLogo.png';
                     }}
                   />
                 ) : (
-                  // Expanded sidebar - use full logo with dark mode adjustments
+                  // Expanded sidebar - use full logo with white filter for light mode, original for dark mode
                   <img 
                     src="/logoW.png" 
                     alt="WooWStudio" 
-                    className="relative w-32 h-8 object-contain"
-                    style={{
-                      filter: `
-                        brightness(55%)      /* overall darkness */
-                        saturate(90%)        /* tone down vibrance */
-                        hue-rotate(-5deg)    /* nudge toward cooler tones */
-                      `
-                    }}
+                    className="relative w-32 h-8 object-contain filter brightness-0 invert dark:brightness-75 dark:contrast-125 dark:invert-0"
                     onError={(e) => {
                       // Fallback to the original logo if logoW doesn't exist
                       e.currentTarget.src = '/WooWStudioGoLogo.png';
-                      e.currentTarget.style.filter = 'brightness(75%) contrast(125%)';
+                      e.currentTarget.style.filter = 'brightness(0) invert(1)';
                     }}
                   />
                 )}
@@ -192,7 +220,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 py-6 space-y-2 relative z-10">
               {navigation.map((item, index) => {
                 const isActive = location.pathname === item.href
                 return (
@@ -206,14 +234,14 @@ export function Layout({ children }: LayoutProps) {
                       to={item.href}
                       className={`group relative flex items-center px-4 py-3 rounded-xl transition-all duration-200 ${
                         isActive
-                          ? 'bg-gradient-to-r from-blue-600/40 to-blue-500/40 border border-blue-500/60 dark:from-slate-600/40 dark:to-slate-500/40 dark:border-slate-500/60 shadow-lg'
-                          : 'hover:bg-blue-100/50 hover:shadow-md dark:hover:bg-slate-700/30'
+                          ? 'bg-gradient-to-r from-blue-500/40 to-blue-400/40 border border-blue-400/60 dark:from-slate-600/40 dark:to-slate-500/40 dark:border-slate-500/60 shadow-lg'
+                          : 'hover:bg-slate-600/30 hover:shadow-md dark:hover:bg-slate-700/30 text-white dark:text-white'
                       }`}
                     >
                       {isActive && (
                         <motion.div
                           layoutId="activeTab"
-                          className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-blue-500/30 dark:from-slate-600/30 dark:to-slate-500/30 rounded-xl"
+                          className="absolute inset-0 bg-gradient-to-r from-blue-500/30 to-blue-400/30 dark:from-slate-600/30 dark:to-slate-500/30 rounded-xl"
                           initial={false}
                           transition={{ type: "spring", stiffness: 500, damping: 30 }}
                         />
@@ -222,24 +250,24 @@ export function Layout({ children }: LayoutProps) {
                         <div className={`p-2 rounded-lg ${
                           isActive 
                             ? 'bg-gradient-to-r from-blue-500 to-blue-400 text-white shadow-lg dark:from-slate-500 dark:to-slate-400' 
-                            : 'bg-blue-100/50 group-hover:bg-gradient-to-r group-hover:from-blue-600/40 group-hover:to-blue-500/40 dark:bg-slate-700/30 dark:group-hover:from-slate-600/40 dark:group-hover:to-slate-500/40'
+                            : 'bg-slate-600/30 group-hover:bg-gradient-to-r group-hover:from-blue-500/40 group-hover:to-blue-400/40 dark:bg-slate-700/30 dark:group-hover:from-slate-600/40 dark:group-hover:to-slate-500/40'
                         }`}>
-                          <item.icon className="h-5 w-5 text-blue-700 dark:text-white" />
+                          <item.icon className="h-5 w-5 text-white" />
                         </div>
                         {!sidebarCollapsed && (
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-blue-900 dark:text-white">{item.name}</span>
+                              <span className="font-medium text-white">{item.name}</span>
                               {isActive && (
                                 <motion.div
                                   layoutId="activeDot"
-                                  className="w-2 h-2 bg-gradient-to-r from-blue-400 to-blue-300 dark:from-slate-400 dark:to-slate-300 rounded-full"
+                                  className="w-2 h-2 bg-gradient-to-r from-blue-300 to-blue-200 dark:from-slate-400 dark:to-slate-300 rounded-full"
                                   initial={false}
                                   transition={{ type: "spring", stiffness: 500, damping: 30 }}
                                 />
                               )}
                             </div>
-                            <p className="text-xs text-blue-600 dark:text-slate-300 mt-1">{item.description}</p>
+                            <p className="text-xs text-slate-300 dark:text-slate-300 mt-1">{item.description}</p>
                           </div>
                         )}
                       </div>
@@ -250,12 +278,12 @@ export function Layout({ children }: LayoutProps) {
             </nav>
 
             {/* Collapse Toggle Button */}
-            <div className="px-4 py-2 border-t border-blue-200/40 dark:border-slate-600/40">
+            <div className="px-4 py-2 border-t border-slate-600/40 dark:border-slate-600/40 relative z-10">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className={`w-full hover:bg-blue-100/50 text-blue-700 dark:hover:bg-slate-700/30 dark:text-white ${sidebarCollapsed ? 'justify-center' : ''}`}
+                className={`w-full hover:bg-slate-600/30 dark:hover:bg-slate-700/30 text-white ${sidebarCollapsed ? 'justify-center' : ''}`}
               >
                 {sidebarCollapsed ? (
                   <ChevronRight className="h-4 w-4" />
@@ -444,7 +472,19 @@ export function Layout({ children }: LayoutProps) {
               <div className="flex items-center space-x-2 text-sm">
                 <span className="text-blue-600 dark:text-blue-400 font-medium">WooWStudiO</span>
                 <ChevronRight className="h-4 w-4 text-blue-400" />
-                <span className="text-slate-600 dark:text-slate-400 capitalize">{location.pathname.slice(1) || 'Dashboard'}</span>
+                <span className="text-slate-600 dark:text-slate-400 capitalize">
+                  {location.pathname === '/' ? 'Home Page' : 
+                   location.pathname === '/dashboard' ? 'Dashboard' :
+                   location.pathname.slice(1).split('/')[0] || 'Dashboard'}
+                </span>
+                {location.pathname.includes('/workflows/') && location.pathname.includes('/edit') && (
+                  <>
+                    <ChevronRight className="h-4 w-4 text-blue-400" />
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {workflowName || 'Loading...'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -476,25 +516,32 @@ export function Layout({ children }: LayoutProps) {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-80 bg-gradient-to-b from-blue-800/95 via-blue-900/95 to-blue-950/95 dark:from-blue-900/98 dark:via-blue-950/98 dark:to-black/98 backdrop-blur-xl border-r border-blue-600/40 dark:border-blue-500/40 shadow-2xl"
+              className="fixed inset-y-0 left-0 w-80 backdrop-blur-xl border-r border-slate-600/40 dark:border-slate-600/40 shadow-2xl relative"
             >
-              <div className="flex h-16 items-center justify-center px-6 border-b border-blue-600/40 dark:border-blue-500/40">
+              {/* Light mode background */}
+              <div className="absolute inset-0 bg-gradient-to-b from-blue-50/95 via-indigo-50/95 to-purple-50/95 dark:hidden" style={{
+                background: 'linear-gradient(152deg, rgba(14, 40, 61, 1) 0%, rgba(104, 158, 190, 1) 100%)',
+                backgroundColor: 'rgb(22, 49, 70)'
+              }} />
+              {/* Dark mode background */}
+              <div className="absolute inset-0 bg-gradient-to-b from-slate-800/95 via-slate-900/95 to-slate-950/95 hidden dark:block" />
+              
+              <div className="flex h-16 items-center justify-center px-6 border-b border-slate-600/40 dark:border-slate-600/40 relative z-10">
                 <div className="flex items-center justify-center flex-1">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-400 rounded-lg blur-sm opacity-75" />
-                    <img src="/WooWStudioGoLogo.png" alt="WooWStudio" className="relative w-8 h-8" />
+                    <img src="/logoW.png" alt="WooWStudio" className="relative w-32 h-8 object-contain filter brightness-0 invert dark:brightness-75 dark:contrast-125 dark:invert-0" />
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setSidebarOpen(false)}
-                  className="hover:bg-blue-700/30 text-white ml-4"
+                  className="hover:bg-slate-600/30 dark:hover:bg-slate-700/30 text-white ml-4"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              <nav className="px-4 py-4 space-y-2">
+              <nav className="px-4 py-4 space-y-2 relative z-10">
                 {navigation.map((item, index) => {
                   const isActive = location.pathname === item.href
                   return (
@@ -509,28 +556,26 @@ export function Layout({ children }: LayoutProps) {
                         onClick={() => setSidebarOpen(false)}
                         className={`group relative flex items-center px-4 py-3 rounded-xl transition-all duration-200 ${
                           isActive
-                            ? 'bg-gradient-to-r from-blue-600/40 to-blue-500/40 border border-blue-500/60 dark:from-slate-600/40 dark:to-slate-500/40 dark:border-slate-500/60 shadow-lg'
-                            : 'hover:bg-blue-100/50 hover:shadow-md dark:hover:bg-slate-700/30'
+                            ? 'bg-gradient-to-r from-blue-500/40 to-blue-400/40 border border-blue-400/60 dark:from-slate-600/40 dark:to-slate-500/40 dark:border-slate-500/60 shadow-lg'
+                            : 'hover:bg-slate-600/30 hover:shadow-md dark:hover:bg-slate-700/30 text-white'
                         }`}
                       >
-                        <div className={`relative flex items-center space-x-3 w-full ${
-                          isActive ? 'text-white' : 'text-white'
-                        }`}>
+                        <div className={`relative flex items-center space-x-3 w-full`}>
                           <div className={`p-2 rounded-lg ${
                             isActive 
                               ? 'bg-gradient-to-r from-blue-500 to-blue-400 text-white shadow-lg dark:from-slate-500 dark:to-slate-400' 
-                              : 'bg-blue-100/50 group-hover:bg-gradient-to-r group-hover:from-blue-600/40 group-hover:to-blue-500/40 dark:bg-slate-700/30 dark:group-hover:from-slate-600/40 dark:group-hover:to-slate-500/40'
+                              : 'bg-slate-600/30 group-hover:bg-gradient-to-r group-hover:from-blue-500/40 group-hover:to-blue-400/40 dark:bg-slate-700/30 dark:group-hover:from-slate-600/40 dark:group-hover:to-slate-500/40'
                           }`}>
-                            <item.icon className="h-5 w-5 text-blue-700 dark:text-white" />
+                            <item.icon className="h-5 w-5 text-white" />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-blue-900 dark:text-white">{item.name}</span>
+                              <span className="font-medium text-white">{item.name}</span>
                               {isActive && (
-                                <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-blue-300 dark:from-slate-400 dark:to-slate-300 rounded-full" />
+                                <div className="w-2 h-2 bg-gradient-to-r from-blue-300 to-blue-200 dark:from-slate-400 dark:to-slate-300 rounded-full" />
                               )}
                             </div>
-                            <p className="text-xs text-blue-600 dark:text-slate-300 mt-1">{item.description}</p>
+                            <p className="text-xs text-slate-300 dark:text-slate-300 mt-1">{item.description}</p>
                           </div>
                         </div>
                       </Link>

@@ -591,6 +591,40 @@
           }
         }
       },
+      "Quartz.Jobs/3.8.1": {
+        "dependencies": {
+          "Quartz": "3.8.1"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Quartz.Jobs.dll": {
+            "assemblyVersion": "3.8.1.0",
+            "fileVersion": "3.8.1.0"
+          }
+        }
+      },
+      "Quartz.Plugins/3.8.1": {
+        "dependencies": {
+          "Quartz.Jobs": "3.8.1"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Quartz.Plugins.dll": {
+            "assemblyVersion": "3.8.1.0",
+            "fileVersion": "3.8.1.0"
+          }
+        }
+      },
+      "Quartz.Plugins.TimeZoneConverter/3.8.1": {
+        "dependencies": {
+          "Quartz.Plugins": "3.8.1",
+          "TimeZoneConverter": "6.1.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Quartz.Plugins.TimeZoneConverter.dll": {
+            "assemblyVersion": "3.8.1.0",
+            "fileVersion": "3.8.1.0"
+          }
+        }
+      },
       "StackExchange.Redis/2.6.122": {
         "dependencies": {
           "Pipelines.Sockets.Unofficial": "2.2.8"
@@ -819,6 +853,14 @@
           }
         }
       },
+      "TimeZoneConverter/6.1.0": {
+        "runtime": {
+          "lib/net6.0/TimeZoneConverter.dll": {
+            "assemblyVersion": "6.1.0.0",
+            "fileVersion": "6.1.0.0"
+          }
+        }
+      },
       "WorkflowSystem.Application/1.0.0": {
         "dependencies": {
           "AutoMapper": "12.0.1",
@@ -862,6 +904,8 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "8.0.0",
           "Quartz": "3.8.1",
           "Quartz.Extensions.DependencyInjection": "3.8.1",
+          "Quartz.Extensions.Hosting": "3.8.1",
+          "Quartz.Plugins.TimeZoneConverter": "3.8.1",
           "WorkflowSystem.Application": "1.0.0"
         },
         "runtime": {
@@ -1201,6 +1245,27 @@
       "path": "quartz.extensions.hosting/3.8.1",
       "hashPath": "quartz.extensions.hosting.3.8.1.nupkg.sha512"
     },
+    "Quartz.Jobs/3.8.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-+2WIfrTdhpKipS33Q27idzJ2MrMv/a/iJC4pwifxq6oKdyaq1tBZmO/x3Ot4V98ElcCyf0WBq/aW0LTGLEPELw==",
+      "path": "quartz.jobs/3.8.1",
+      "hashPath": "quartz.jobs.3.8.1.nupkg.sha512"
+    },
+    "Quartz.Plugins/3.8.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-SJzDeiNeQ+sFVMTrGCvDRpwXY4aANGEHAnxUrrESp+2ae5RoOF9Bm/pKA3CpT26d0+B05+l2QsKO/w0p5xjNGA==",
+      "path": "quartz.plugins/3.8.1",
+      "hashPath": "quartz.plugins.3.8.1.nupkg.sha512"
+    },
+    "Quartz.Plugins.TimeZoneConverter/3.8.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-1jYCB8YkmM1XCCAm4qFFb4VH0xxRTDMiZ/6W9QJjeZ5NonWVMXDMzmsELaDWoLJLEg4InQ5DsRr8FL6MILIJaQ==",
+      "path": "quartz.plugins.timezoneconverter/3.8.1",
+      "hashPath": "quartz.plugins.timezoneconverter.3.8.1.nupkg.sha512"
+    },
     "StackExchange.Redis/2.6.122": {
       "type": "package",
       "serviceable": true,
@@ -1396,6 +1461,13 @@
       "sha512": "sha512-IXoJOXIqc39AIe+CIR7koBtRGMiCt/LPM3lI+PELtDIy9XdyeSrwXFdWV9dzJ2Awl0paLWUaknLxFQ5HpHZUog==",
       "path": "system.windows.extensions/6.0.0",
       "hashPath": "system.windows.extensions.6.0.0.nupkg.sha512"
+    },
+    "TimeZoneConverter/6.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-UGdtyKWJqXXinyvGB9X6NVoIYbTAidoZYmn3aXzxeEYC9+OL8vF36eDt1qjb6RqBkWDl4v7iE84ecI+dFhA80A==",
+      "path": "timezoneconverter/6.1.0",
+      "hashPath": "timezoneconverter.6.1.0.nupkg.sha512"
     },
     "WorkflowSystem.Application/1.0.0": {
       "type": "project",

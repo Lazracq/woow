@@ -19,24 +19,33 @@ export interface Workflow {
 
 export interface WorkflowNode {
   id: string
-  taskId: string
-  position: { x: number; y: number }
+  name: string
+  type: string
+  configuration: string
+  positionX: number
+  positionY: number
+  isActive: boolean
+  isStartingNode: boolean
   connections: string[]
-  isStartingNode?: boolean
 }
 
 export interface CreateWorkflowNodeRequest {
-  taskId: string
-  position: { x: number; y: number }
+  name: string
+  type: string
+  configuration: string
+  positionX: number
+  positionY: number
+  isActive?: boolean
   connections?: string[]
-  isStartingNode?: boolean
 }
 
 export interface UpdateWorkflowNodeRequest {
-  taskId?: string
   position?: { x: number; y: number }
+  name?: string
+  type?: string
+  configuration?: string
+  isActive?: boolean
   connections?: string[]
-  isStartingNode?: boolean
 }
 
 export interface AddConnectionRequest {
@@ -247,14 +256,14 @@ class ApiService {
   }
 
   // Performance endpoints
-  async getPerformanceMetrics(): Promise<any> {
+  async getPerformanceMetrics(): Promise<Record<string, unknown>> {
     console.log('Fetching performance metrics...')
-    return this.request<any>('/performance/metrics')
+    return this.request<Record<string, unknown>>('/performance/metrics')
   }
 
-  async getRecentExecutions(count: number = 100): Promise<any[]> {
+  async getRecentExecutions(count: number = 100): Promise<Record<string, unknown>[]> {
     console.log('Fetching recent executions...')
-    return this.request<any[]>(`/performance/executions/recent?count=${count}`)
+    return this.request<Record<string, unknown>[]>(`/performance/executions/recent?count=${count}`)
   }
 
   // Execution endpoints

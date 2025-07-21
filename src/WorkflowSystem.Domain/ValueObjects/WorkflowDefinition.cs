@@ -20,8 +20,8 @@ public class TaskDefinition
     public string Name { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
     public string Configuration { get; set; } = string.Empty;
-    public int PositionX { get; set; }
-    public int PositionY { get; set; }
+    public double PositionX { get; set; }
+    public double PositionY { get; set; }
 }
 
 public class VariableDefinition

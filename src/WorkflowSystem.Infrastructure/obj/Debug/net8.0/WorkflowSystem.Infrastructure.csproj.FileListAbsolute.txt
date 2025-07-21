@@ -17,3 +17,4 @@
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Infrastructure/obj/Debug/net8.0/WorkflowSystem.Infrastructure.pdb
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Infrastructure/obj/Debug/net8.0/WorkflowSystem.Infrastructure.genruntimeconfig.cache
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Infrastructure/obj/Debug/net8.0/ref/WorkflowSystem.Infrastructure.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Infrastructure/obj/Debug/net8.0/WorkflowSystem.Infrastructure.sourcelink.json

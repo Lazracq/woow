@@ -12,25 +12,29 @@ namespace WorkflowSystem.API.Controllers
         [HttpGet("metrics")]
         public async Task<IActionResult> GetPerformanceMetrics()
         {
-            // For now, return sample performance metrics
+            await Task.CompletedTask; // Placeholder for future implementation
+            
+            // For now, return sample metrics
             var metrics = new
             {
                 cpuUsage = 45.2,
                 memoryUsage = 67.8,
-                activeConnections = 12,
-                requestsPerSecond = 23.4,
-                averageResponseTime = 125.6,
-                errorRate = 0.5
+                diskUsage = 23.1,
+                networkThroughput = 125.5,
+                activeConnections = 42,
+                averageResponseTime = 125.3
             };
 
             return Ok(metrics);
         }
 
-        [HttpGet("executions/recent")]
-        public async Task<IActionResult> GetRecentExecutions([FromQuery] int count = 100)
+        [HttpGet("recent-executions")]
+        public async Task<IActionResult> GetRecentExecutions()
         {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
             // For now, return sample recent executions
-            var executions = new List<object>
+            var executions = new[]
             {
                 new
                 {

@@ -13,20 +13,18 @@ import {
   Copy,
   Settings,
   Workflow,
-  Eye,
   Loader2,
   CheckCircle,
   AlertCircle,
   Power,
   PowerOff,
-  Archive,
   Plus,
   X,
-  Variable,
   Clock,
   Zap,
   MousePointer,
-  Globe
+  Globe,
+  RefreshCw
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -34,12 +32,7 @@ import { Workflow as WorkflowType } from '@/services/api'
 import { WorkflowStudio } from '@/components/WorkflowStudio'
 import { apiService } from '@/services/api'
 
-interface WorkflowVariable {
-  id: string
-  name: string
-  value: string
-  type: 'Global' | 'System'
-}
+
 
 interface WorkflowTrigger {
   id: string
@@ -57,7 +50,7 @@ export function EditWorkflow() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'settings' | 'studio'>('settings')
+  const [activeTab, setActiveTab] = useState<'settings' | 'studio'>('studio')
 
   // Form state
   const [formData, setFormData] = useState({
@@ -65,13 +58,7 @@ export function EditWorkflow() {
     description: ''
   })
 
-  // Variables state
-  const [variables, setVariables] = useState<WorkflowVariable[]>([])
-  const [newVariable, setNewVariable] = useState({
-    name: '',
-    value: '',
-    type: 'Global' as 'Global' | 'System'
-  })
+
 
   // Triggers state
   const [triggers, setTriggers] = useState<WorkflowTrigger[]>([])
@@ -105,9 +92,7 @@ export function EditWorkflow() {
         description: workflowData.description || ''
       })
 
-      // Load variables from API (when available)
-      // For now, we'll use empty array until variables API is implemented
-      setVariables([])
+
 
       // Load triggers from API (when available)
       // For now, we'll use empty array until triggers API is implemented
@@ -178,52 +163,7 @@ export function EditWorkflow() {
     }
   }
 
-  const handleArchive = async () => {
-    try {
-      setSaving(true)
-      setError(null)
-      
-      // In a real app, you would call the API here
-      // await apiService.archiveWorkflow(workflow!.id)
-      
-      setSuccess('Workflow archived successfully!')
-      setTimeout(() => {
-        navigate('/workflows')
-      }, 2000)
-    } catch (err) {
-      console.error('Failed to archive workflow:', err)
-      setError('Failed to archive workflow. Please try again.')
-    } finally {
-      setSaving(false)
-    }
-  }
 
-  const handleAddVariable = () => {
-    if (!newVariable.name.trim() || !newVariable.value.trim()) {
-      setError('Variable name and value are required')
-      return
-    }
-
-    if (variables.some(v => v.name === newVariable.name)) {
-      setError('Variable name already exists')
-      return
-    }
-
-    const variable: WorkflowVariable = {
-      id: Date.now().toString(),
-      name: newVariable.name.trim(),
-      value: newVariable.value.trim(),
-      type: newVariable.type
-    }
-
-    setVariables(prev => [...prev, variable])
-    setNewVariable({ name: '', value: '', type: 'Global' })
-    setError(null)
-  }
-
-  const handleRemoveVariable = (id: string) => {
-    setVariables(prev => prev.filter(v => v.id !== id))
-  }
 
   const handleAddTrigger = () => {
     if (!newTrigger.name.trim()) {
@@ -334,53 +274,21 @@ export function EditWorkflow() {
 
   return (
     <motion.div 
-      className="space-y-8"
+      className="space-y-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Header */}
-      <motion.div 
-        className="relative overflow-hidden rounded-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-slate-800/50 shadow-2xl"
+      {/* Action Bar */}
+      <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
+        className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-slate-800/50 rounded-xl p-4 shadow-lg"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-indigo-500/5 dark:from-blue-500/10 dark:via-purple-500/10 dark:to-indigo-500/10" />
-        <div className="relative flex items-center justify-between p-8">
-          <div className="flex items-center space-x-4">
-            <motion.div 
-              className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg"
-              whileHover={{ scale: 1.05, rotate: 5 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Workflow className="h-8 w-8 text-white" />
-            </motion.div>
-            <div>
-              <motion.h1 
-                className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                Edit Workflow
-              </motion.h1>
-              <motion.p 
-                className="text-lg text-slate-600 dark:text-slate-400 mt-2"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                Modify workflow settings and configuration
-              </motion.p>
-            </div>
-          </div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4 }}
-            className="flex items-center space-x-3"
-          >
+        <div className="flex items-center justify-between">
+          {/* Left side - Back button */}
+          <div className="flex items-center">
             <Button 
               variant="outline" 
               size="sm" 
@@ -390,6 +298,10 @@ export function EditWorkflow() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
+          </div>
+
+          {/* Right side - Action buttons */}
+          <div className="flex items-center space-x-2">
             <Button 
               size="sm" 
               className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white shadow-lg"
@@ -403,7 +315,50 @@ export function EditWorkflow() {
               )}
               Save Changes
             </Button>
-          </motion.div>
+            <Button variant="outline" size="sm" className="hover:bg-green-500/10 dark:hover:bg-green-500/20">
+              <Play className="h-4 w-4 mr-2" />
+              Run
+            </Button>
+            <Button variant="outline" size="sm" className="hover:bg-blue-500/10 dark:hover:bg-blue-500/20">
+              <Copy className="h-4 w-4 mr-2" />
+              Clone
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleToggleActive}
+              disabled={saving}
+              className={`hover:bg-orange-500/10 dark:hover:bg-orange-500/20 ${
+                workflow?.isActive 
+                  ? 'text-orange-600 hover:text-orange-700' 
+                  : 'text-green-600 hover:text-green-700'
+              }`}
+            >
+              {workflow?.isActive ? (
+                <PowerOff className="h-4 w-4 mr-2" />
+              ) : (
+                <Power className="h-4 w-4 mr-2" />
+              )}
+              {workflow?.isActive ? 'Deactivate' : 'Activate'}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="hover:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={loadWorkflow}
+              disabled={loading}
+              className="hover:bg-blue-500/10 dark:hover:bg-blue-500/20 text-blue-600 hover:text-blue-700"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </motion.div>
 
@@ -430,69 +385,6 @@ export function EditWorkflow() {
         </motion.div>
       )}
 
-      {/* Quick Actions Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-slate-800/50 rounded-xl p-4 shadow-lg"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" className="hover:bg-green-500/10 dark:hover:bg-green-500/20">
-              <Play className="h-4 w-4 mr-2" />
-              Run Workflow
-            </Button>
-            <Button variant="outline" size="sm" className="hover:bg-blue-500/10 dark:hover:bg-blue-500/20">
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicate
-            </Button>
-            <Button variant="outline" size="sm" className="hover:bg-purple-500/10 dark:hover:bg-purple-500/20">
-              <Eye className="h-4 w-4 mr-2" />
-              View History
-            </Button>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleToggleActive}
-              disabled={saving}
-              className={`hover:bg-orange-500/10 dark:hover:bg-orange-500/20 ${
-                workflow?.isActive 
-                  ? 'text-orange-600 hover:text-orange-700' 
-                  : 'text-green-600 hover:text-green-700'
-              }`}
-            >
-              {workflow?.isActive ? (
-                <PowerOff className="h-4 w-4 mr-2" />
-              ) : (
-                <Power className="h-4 w-4 mr-2" />
-              )}
-              {workflow?.isActive ? 'Deactivate' : 'Activate'}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleArchive}
-              disabled={saving}
-              className="hover:bg-yellow-500/10 dark:hover:bg-yellow-500/20 text-yellow-600 hover:text-yellow-700"
-            >
-              <Archive className="h-4 w-4 mr-2" />
-              Archive
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="hover:bg-red-500/10 dark:hover:bg-red-500/20 text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-
       {/* Modern Tab Navigation */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -506,30 +398,6 @@ export function EditWorkflow() {
         {/* Tab Container */}
         <div className="relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-white/20 dark:border-slate-800/50 shadow-xl p-1">
           <div className="flex space-x-1">
-            <motion.button
-              onClick={() => setActiveTab('settings')}
-              className={`flex-1 px-6 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden ${
-                activeTab === 'settings'
-                  ? 'text-white shadow-lg'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-              }`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              {activeTab === 'settings' && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl"
-                  initial={false}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                />
-              )}
-              <div className="relative flex items-center justify-center space-x-2">
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </div>
-            </motion.button>
-            
             <motion.button
               onClick={() => setActiveTab('studio')}
               className={`flex-1 px-6 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden ${
@@ -551,6 +419,30 @@ export function EditWorkflow() {
               <div className="relative flex items-center justify-center space-x-2">
                 <Workflow className="h-4 w-4" />
                 <span>Studio</span>
+              </div>
+            </motion.button>
+            
+            <motion.button
+              onClick={() => setActiveTab('settings')}
+              className={`flex-1 px-6 py-4 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden ${
+                activeTab === 'settings'
+                  ? 'text-white shadow-lg'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+              }`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              {activeTab === 'settings' && (
+                <motion.div
+                  layoutId="activeTab"
+                  className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl"
+                  initial={false}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                />
+              )}
+              <div className="relative flex items-center justify-center space-x-2">
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
               </div>
             </motion.button>
           </div>
@@ -756,105 +648,7 @@ export function EditWorkflow() {
                 </CardContent>
               </Card>
 
-              {/* Variables Management */}
-              <Card className="border-blue-500/20 dark:border-blue-400/20 bg-gradient-to-br from-white/50 to-gray-50/30 dark:from-gray-800/50 dark:to-gray-900/30 backdrop-blur-xl">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2 dark:text-white">
-                    <Variable className="h-5 w-5 text-purple-500" />
-                    <span>Variables</span>
-                  </CardTitle>
-                  <CardDescription className="dark:text-gray-300">
-                    Manage global and system variables for this workflow
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Add New Variable */}
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="dark:text-white">Variable Name</Label>
-                        <Input
-                          value={newVariable.name}
-                          onChange={(e) => setNewVariable(prev => ({ ...prev, name: e.target.value }))}
-                          placeholder="e.g., API_BASE_URL"
-                          className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl border-blue-500/20 dark:border-blue-400/20 dark:text-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="dark:text-white">Value</Label>
-                        <Input
-                          value={newVariable.value}
-                          onChange={(e) => setNewVariable(prev => ({ ...prev, value: e.target.value }))}
-                          placeholder="e.g., https://api.example.com"
-                          className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl border-blue-500/20 dark:border-blue-400/20 dark:text-white"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="dark:text-white">Type</Label>
-                        <select
-                          value={newVariable.type}
-                          onChange={(e) => setNewVariable(prev => ({ ...prev, type: e.target.value as 'Global' | 'System' }))}
-                          className="w-full p-2 rounded-md bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl border border-blue-500/20 dark:border-blue-400/20 dark:text-white"
-                        >
-                          <option value="Global">Global</option>
-                          <option value="System">System</option>
-                        </select>
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={handleAddVariable}
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Variable
-                    </Button>
-                  </div>
 
-                  {/* Variables List */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium dark:text-white">Current Variables</h4>
-                    {variables.length === 0 ? (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">No variables defined yet.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {variables.map((variable) => (
-                          <motion.div
-                            key={variable.id}
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="flex items-center justify-between p-3 bg-white/30 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700"
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2">
-                                <span className="font-medium dark:text-white">{variable.name}</span>
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs ${
-                                    variable.type === 'System' 
-                                      ? 'border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400'
-                                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
-                                  }`}
-                                >
-                                  {variable.type}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{variable.value}</p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveVariable(variable.id)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Sidebar */}
@@ -948,24 +742,7 @@ export function EditWorkflow() {
                 </CardContent>
               </Card>
 
-              {/* Variables Summary */}
-              <Card className="border-blue-500/20 dark:border-blue-400/20 bg-gradient-to-br from-white/50 to-gray-50/30 dark:from-gray-800/50 dark:to-gray-900/30 backdrop-blur-xl">
-                <CardHeader>
-                  <CardTitle className="dark:text-white">Variables Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="text-center p-2 rounded-lg bg-purple-500/5 dark:bg-purple-500/20">
-                      <div className="font-semibold dark:text-white">{variables.filter(v => v.type === 'Global').length}</div>
-                      <div className="text-xs text-muted-foreground">Global</div>
-                    </div>
-                    <div className="text-center p-2 rounded-lg bg-blue-500/5 dark:bg-blue-500/20">
-                      <div className="font-semibold dark:text-white">{variables.filter(v => v.type === 'System').length}</div>
-                      <div className="text-xs text-muted-foreground">System</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+
             </div>
           </div>
         ) : (

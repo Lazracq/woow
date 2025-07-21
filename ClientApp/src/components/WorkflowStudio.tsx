@@ -1,732 +1,1101 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { motion, PanInfo } from 'framer-motion'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
+import ReactFlow, {
+  Node,
+  Edge,
+  addEdge,
+  Connection,
+  useNodesState,
+  useEdgesState,
+  Controls,
+  Background,
+  MiniMap,
+  NodeTypes,
+  Handle,
+  Position,
+  MarkerType,
+  NodeChange,
+  useReactFlow,
+} from 'reactflow'
+import 'reactflow/dist/style.css'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
-  Settings,
-  Database,
-  FileText,
-  Mail,
-  Zap,
-  Clock,
-  CheckCircle,
-  Loader2,
-  Workflow,
   Play,
-  Star,
-  RotateCcw,
-  ZoomIn,
-  ZoomOut
+  Settings,
+  Plus,
+  Trash2,
+  Database,
+  Mail,
+  Globe,
+  Code,
+  Clock,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  UploadCloud,
+  GitBranch,
+  Repeat,
+  Shuffle,
+  GitMerge,
+  HelpCircle,
+  Plug
 } from 'lucide-react'
-import { apiService, WorkflowNode, CreateWorkflowNodeRequest, UpdateWorkflowNodeRequest } from '@/services/api'
+import { apiService } from '@/services/api'
+import { debounce } from 'lodash'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 
-interface Task {
-  id: string
-  name: string
-  type: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  color: string
-  bgColor: string
-}
-
-interface Connection {
-  id: string
-  sourceNodeId: string
-  targetNodeId: string
+interface NodeData {
+  label: string
+  type?: string
+  description?: string
+  isActive?: boolean
+  config?: any // Added for dynamic config
 }
 
 interface WorkflowStudioProps {
   workflowId: string
 }
 
+// Custom Node Types
+const StartingNode = () => {
+  const [showStartModal, setShowStartModal] = useState(false);
+  return (
+    <Card className="w-64 border-2 border-green-500 bg-green-50 dark:bg-green-900/20 flex flex-col items-center justify-center relative">
+      <CardContent className="flex flex-col items-center justify-center py-8">
+        <button
+          className="flex flex-col items-center justify-center focus:outline-none group"
+          onClick={() => setShowStartModal(true)}
+          title="Start Workflow"
+        >
+          <Play className="h-16 w-16 text-green-600 group-hover:scale-110 transition-transform duration-150" />
+          <span className="mt-2 font-semibold text-lg text-green-700 dark:text-green-300">Start Workflow</span>
+        </button>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Workflow starting point</p>
+        {/* Plug handle */}
+        <div style={{ position: 'absolute', right: -20, top: '50%', transform: 'translateY(-50%)', zIndex: 3, pointerEvents: 'none' }}>
+          <Plug className="text-green-600 dark:text-green-400" style={{ width: 32, height: 32 }} />
+        </div>
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="onExecute"
+          style={{
+            background: '#10b981',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 24,
+            height: 24,
+            border: '3px solid #10b981',
+            borderRadius: '50%',
+            zIndex: 2,
+            right: -12,
+          }}
+        />
+      </CardContent>
+      {/* Modal for execution confirmation */}
+      <Dialog open={showStartModal} onOpenChange={setShowStartModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Execute Workflow</DialogTitle>
+            <DialogDescription>Are you sure you want to start this workflow?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowStartModal(false)}>Cancel</Button>
+            <Button className="bg-green-600 text-white" onClick={() => { setShowStartModal(false); /* TODO: trigger execution */ }}>Start</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
+// Helper: Node type style map
+const NODE_TYPE_STYLES: Record<string, { border: string; bg: string; icon: JSX.Element }> = {
+  HttpCallout: {
+    border: 'border-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    icon: <Globe className="h-4 w-4 text-blue-500" />,
+  },
+  ScriptExecution: {
+    border: 'border-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    icon: <Code className="h-4 w-4 text-purple-500" />,
+  },
+  StoragePush: {
+    border: 'border-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    icon: <UploadCloud className="h-4 w-4 text-green-500" />,
+  },
+  Conditional: {
+    border: 'border-yellow-500',
+    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
+    icon: <HelpCircle className="h-4 w-4 text-yellow-500" />,
+  },
+  Split: {
+    border: 'border-pink-500',
+    bg: 'bg-pink-50 dark:bg-pink-900/20',
+    icon: <GitBranch className="h-4 w-4 text-pink-500" />,
+  },
+  Iteration: {
+    border: 'border-blue-400',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    icon: <Repeat className="h-4 w-4 text-blue-400" />,
+  },
+  Merge: {
+    border: 'border-gray-500',
+    bg: 'bg-gray-50 dark:bg-gray-900/20',
+    icon: <GitMerge className="h-4 w-4 text-gray-500" />,
+  },
+  Delay: {
+    border: 'border-orange-500',
+    bg: 'bg-orange-50 dark:bg-orange-900/20',
+    icon: <Clock className="h-4 w-4 text-orange-500" />,
+  },
+  Batch: {
+    border: 'border-red-500',
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    icon: <Shuffle className="h-4 w-4 text-red-500" />,
+  },
+  Parallel: {
+    border: 'border-purple-500',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    icon: <Shuffle className="h-4 w-4 text-purple-500" />,
+  },
+  DataTransformation: {
+    border: 'border-teal-500',
+    bg: 'bg-teal-50 dark:bg-teal-900/20',
+    icon: <Code className="h-4 w-4 text-teal-500" />,
+  },
+  start: {
+    border: 'border-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    icon: <Play className="h-4 w-4 text-green-600" />,
+  },
+}
+
+// Helper: Get node description
+const getNodeDescription = (type: string, config: any) => {
+  switch (type) {
+    case 'Delay':
+      return `Pause workflow for ${config?.DurationSeconds || 60} seconds.`
+    case 'HttpCallout':
+      return `Call ${config?.Url || 'an API endpoint'} (${config?.Method || 'GET'})`
+    case 'ScriptExecution':
+      return `Run a ${config?.Language || 'script'} script.`
+    case 'StoragePush':
+      return `Push data to ${config?.DestinationType || 'SFTP'}`
+    case 'Conditional':
+      return `If ${config?.Expression || 'condition'}`
+    case 'Split':
+      return `Split into ${config?.Branches || 2} branches.`
+    case 'Iteration':
+      return `For each in ${config?.Collection || 'items'}`
+    case 'Merge':
+      return `Merge branches.`
+    case 'Batch':
+      return `Run tasks in batch.`
+    case 'Parallel':
+      return `Run tasks in parallel.`
+    case 'DataTransformation':
+      return `Transform data using ${config?.Language || 'script'}`
+    default:
+      return ''
+  }
+}
+
+// Modal state
+// Remove these from the top-level scope:
+// const [editNode, setEditNode] = useState<Node<NodeData> | null>(null)
+// const [editConfig, setEditConfig] = useState<any>(null)
+// const [editLabel, setEditLabel] = useState<string>('')
+
+const TaskNode = ({ data, id }: { data: NodeData; id: string }) => {
+  const style = NODE_TYPE_STYLES[data.type || 'HttpCallout'] || NODE_TYPE_STYLES['HttpCallout']
+  return (
+    <Card className={`w-64 border-2 ${style.border} ${style.bg} group relative`}>
+      {/* Action buttons */}
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <button
+          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+          onClick={e => { e.stopPropagation(); setEditNode({ id, data }); setEditConfig(data.config); setEditLabel(data.label); }}
+          title="Edit"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+        <button
+          className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900"
+          onClick={e => { e.stopPropagation(); if (window.confirm('Delete this node?')) deleteNode(id); }}
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center space-x-2 text-sm">
+          {style.icon}
+          <span>{data.label}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+          {getNodeDescription(data.type, data.config)}
+        </p>
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="target"
+          style={{ background: '#3b82f6' }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="onSuccess"
+          style={{ background: '#10b981', top: '30%' }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="onFailure"
+          style={{ background: '#ef4444', top: '70%' }}
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
+// Move nodeTypes outside the component
+const nodeTypes: NodeTypes = {
+  startingNode: StartingNode,
+  taskNode: TaskNode,
+};
+
 export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([])
-  const [connections, setConnections] = useState<Connection[]>([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null)
+  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null)
-  const [draggedNode, setDraggedNode] = useState<WorkflowNode | null>(null)
-  const [connectingNode, setConnectingNode] = useState<string | null>(null)
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const canvasRef = useRef<HTMLDivElement>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [isPanning, setIsPanning] = useState(false)
-  const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 })
+  const [lastSavedPositions, setLastSavedPositions] = useState<Record<string, { x: number; y: number }>>({})
+  const studioRef = useRef<HTMLDivElement>(null);
+  // Detect dark mode
+  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
 
-  // Available task types
-  const availableTasks: Task[] = [
-    {
-      id: 'start',
-      name: 'Start',
-      type: 'trigger',
-      description: 'Workflow starting point',
-      icon: Play,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10'
-    },
-    {
-      id: 'data-processing',
-      name: 'Data Processing',
-      type: 'data',
-      description: 'Process and transform data',
-      icon: Database,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10'
-    },
-    {
-      id: 'email-notification',
-      name: 'Email Notification',
-      type: 'notification',
-      description: 'Send email notifications',
-      icon: Mail,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10'
-    },
-    {
-      id: 'file-operation',
-      name: 'File Operation',
-      type: 'file',
-      description: 'Read or write files',
-      icon: FileText,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10'
-    },
-    {
-      id: 'api-call',
-      name: 'API Call',
-      type: 'api',
-      description: 'Make HTTP requests',
-      icon: Zap,
-      color: 'text-orange-500',
-      bgColor: 'bg-orange-500/10'
-    },
-    {
-      id: 'delay',
-      name: 'Delay',
-      type: 'control',
-      description: 'Wait for specified time',
-      icon: Clock,
-      color: 'text-gray-500',
-      bgColor: 'bg-gray-500/10'
-    },
-    {
-      id: 'condition',
-      name: 'Condition',
-      type: 'control',
-      description: 'Conditional logic',
-      icon: CheckCircle,
-      color: 'text-indigo-500',
-      bgColor: 'bg-indigo-500/10'
-    }
-  ]
+  // ✅ Move these hooks here:
+  const [editNode, setEditNode] = useState<Node<NodeData> | null>(null)
+  const [editConfig, setEditConfig] = useState<any>(null)
+  const [editLabel, setEditLabel] = useState<string>('')
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
   useEffect(() => {
-    loadWorkflowData()
-  }, [workflowId])
+    function updateStudioBg() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (studioRef.current) {
+        studioRef.current.style.backgroundColor = isDark ? '#18181b' : '#fff';
+      }
+      if (document.fullscreenElement) {
+        document.body.style.backgroundColor = isDark ? '#18181b' : '#fff';
+      } else {
+        document.body.style.backgroundColor = '';
+      }
+    }
 
-  const loadWorkflowData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      // Load workflow nodes from API
-      const nodes = await apiService.getWorkflowNodes(workflowId)
-      setWorkflowNodes(nodes || [])
-      
-      // Extract connections from nodes
-      const nodeConnections: Connection[] = []
-      if (nodes) {
-        nodes.forEach(node => {
-          node.connections.forEach(targetNodeId => {
-            nodeConnections.push({
-              id: `${node.id}-${targetNodeId}`,
-              sourceNodeId: node.id,
-              targetNodeId
+    // Listen for theme changes
+    const observer = new MutationObserver(updateStudioBg);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    // Listen for fullscreen changes
+    document.addEventListener('fullscreenchange', updateStudioBg);
+
+    // Initial set
+    updateStudioBg();
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('fullscreenchange', updateStudioBg);
+    };
+  }, []);
+
+  // Load workflow data from API
+  useEffect(() => {
+    const loadWorkflowData = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Load workflow nodes from API
+        const workflowNodes = await apiService.getWorkflowNodes(workflowId)
+        
+        if (workflowNodes && workflowNodes.length > 0) {
+          // Convert API nodes to React Flow nodes
+          const reactFlowNodes: Node<NodeData>[] = workflowNodes.map(node => ({
+            id: node.id,
+            type: node.isStartingNode || node.type === 'start' ? 'startingNode' : 'taskNode',
+            position: { x: node.positionX, y: node.positionY },
+            data: {
+              label: node.name,
+              type: node.type || 'http',
+              description: `Task ${node.name}`,
+              isActive: node.isActive,
+              config: node.configuration ? JSON.parse(node.configuration) : {}, // Add config
+            },
+          }))
+
+          // Convert connections to React Flow edges
+          const reactFlowEdges: Edge[] = []
+          workflowNodes.forEach(node => {
+            node.connections.forEach(targetNodeId => {
+              reactFlowEdges.push({
+                id: `${node.id}-${targetNodeId}`,
+                source: node.id,
+                target: targetNodeId,
+                sourceHandle: 'onExecute', // Default handle
+                targetHandle: 'target',
+                type: 'smoothstep',
+                markerEnd: {
+                  type: MarkerType.ArrowClosed,
+                  width: 20,
+                  height: 20,
+                  color: '#10b981',
+                },
+                style: { 
+                  stroke: '#10b981', 
+                  strokeWidth: 2 
+                },
+                label: 'On Execute',
+                labelStyle: { 
+                  fill: '#10b981', 
+                  fontWeight: 600 
+                },
+                labelBgStyle: { fill: '#ffffff', fillOpacity: 0.8 },
+              })
             })
           })
-        })
+
+          setNodes(reactFlowNodes)
+          setEdges(reactFlowEdges)
+        } else {
+          // If no nodes exist, create a proper starting node in the database
+          await createStartingNode()
+        }
+      } catch (err) {
+        console.error('Failed to load workflow data:', err)
+        setError('Failed to load workflow data. Please try again.')
+        
+        // Try to create a starting node as fallback
+        try {
+          await createStartingNode()
+        } catch (createError) {
+          console.error('Failed to create starting node as fallback:', createError)
+          // If all else fails, show a minimal starting node
+          const fallbackNodes: Node<NodeData>[] = [
+            {
+              id: 'start',
+              type: 'startingNode',
+              position: { x: 50, y: 200 },
+              data: { label: 'Start Workflow' },
+            },
+          ]
+          setNodes(fallbackNodes)
+          setEdges([])
+        }
+      } finally {
+        setLoading(false)
       }
-      setConnections(nodeConnections)
-      
-      setTasks(availableTasks)
-    } catch (err) {
-      console.error('Failed to load workflow data:', err)
-      setError('Failed to load workflow data. Please try again.')
-      // Set empty arrays as fallback
-      setWorkflowNodes([])
-      setConnections([])
-      setTasks(availableTasks)
-    } finally {
-      setLoading(false)
     }
-  }
 
-  const handleDragStart = (task: Task) => {
-    setDraggedTask(task)
-  }
+    if (workflowId) {
+      loadWorkflowData()
+    }
+  }, [workflowId, setNodes, setEdges])
 
-  const handleDragEnd = () => {
-    setDraggedTask(null)
-  }
-
-  const handleCanvasDrop = async (e: React.DragEvent) => {
-    e.preventDefault()
-    if (draggedTask && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      const x = (e.clientX - rect.left - pan.x) / zoom
-      const y = (e.clientY - rect.top - pan.y) / zoom
+  // Create starting node if needed
+  const createStartingNode = useCallback(async () => {
+    try {
+      await apiService.createWorkflowNode(workflowId, {
+        name: 'Start Workflow',
+        type: 'start',
+        configuration: '{}',
+        positionX: 0,
+        positionY: 0,
+        isActive: true,
+        connections: []
+      })
       
+      // Reload the workflow data to get the new starting node
+      const workflowNodes = await apiService.getWorkflowNodes(workflowId)
+      
+      if (workflowNodes && workflowNodes.length > 0) {
+        const reactFlowNodes: Node<NodeData>[] = workflowNodes.map(node => ({
+          id: node.id,
+          type: node.isStartingNode ? 'startingNode' : 'taskNode',
+          position: { x: node.positionX, y: node.positionY },
+          data: {
+            label: node.name,
+            type: node.type || 'http',
+            description: `Task ${node.name}`,
+            isActive: node.isActive,
+            config: node.configuration ? JSON.parse(node.configuration) : {}, // Add config
+          },
+        }))
+        
+        setNodes(reactFlowNodes)
+        setEdges([])
+      }
+    } catch (error) {
+      console.error('Failed to create starting node:', error)
+      setError('Failed to create starting node. Please try again.')
+    }
+  }, [workflowId, setNodes, setEdges])
+
+  // Debounced save function
+  const saveNodePositions = useCallback(
+    debounce(async (nodePositions: Record<string, { x: number; y: number }>) => {
       try {
-        const newNodeRequest: CreateWorkflowNodeRequest = {
-          taskId: draggedTask.id,
-          position: { x, y },
-          connections: [],
-          isStartingNode: draggedTask.id === 'start'
+        setSaving(true)
+        console.log('Saving node positions:', nodePositions)
+        
+        // Filter out nodes with invalid GUIDs (like 'start' node)
+        const validNodePositions = Object.entries(nodePositions).filter(([nodeId]) => {
+          // Check if nodeId is a valid GUID
+          const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          return guidRegex.test(nodeId)
+        })
+        
+        if (validNodePositions.length === 0) {
+          return
         }
         
-        const newNode = await apiService.createWorkflowNode(workflowId, newNodeRequest)
-        setWorkflowNodes(prev => [...prev, newNode])
-        setDraggedTask(null)
-      } catch (err) {
-        console.error('Failed to create workflow node:', err)
-        setError('Failed to create workflow node. Please try again.')
+        // Check if positions have actually changed
+        const hasChanges = validNodePositions.some(([nodeId, position]) => {
+          const lastSaved = lastSavedPositions[nodeId]
+          return !lastSaved || 
+                 lastSaved.x !== position.x || 
+                 lastSaved.y !== position.y
+        })
+
+        if (hasChanges) {
+          // Save each node position to the backend
+          const savePromises = validNodePositions.map(([nodeId, position]) =>
+            apiService.updateWorkflowNode(workflowId, nodeId, { position })
+          )
+          
+          await Promise.all(savePromises)
+          
+          // Update last saved positions only for valid nodes
+          const newLastSaved = { ...lastSavedPositions }
+          validNodePositions.forEach(([nodeId, position]) => {
+            newLastSaved[nodeId] = position
+          })
+          setLastSavedPositions(newLastSaved)
+          
+        }
+      } catch (error) {
+        console.error('Failed to save node positions:', error)
+        setError('Failed to save node positions. Please try again.')
+      } finally {
+        setSaving(false)
       }
+    }, 1000),
+    [workflowId, lastSavedPositions]
+  )
+
+  // Debounced save effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (nodes.length > 0) {
+        // Filter out nodes with invalid GUIDs
+        const validNodes = nodes.filter(node => {
+          const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+          return guidRegex.test(node.id)
+        })
+        
+        if (validNodes.length === 0) {
+          return
+        }
+        
+        const currentPositions = validNodes.reduce((acc, node) => {
+          acc[node.id] = { x: node.position.x, y: node.position.y }
+          return acc
+        }, {} as Record<string, { x: number; y: number }>)
+
+        // Check if any positions have changed
+        const hasChanges = validNodes.some(node => {
+          const lastSaved = lastSavedPositions[node.id]
+          return !lastSaved || 
+                 lastSaved.x !== node.position.x || 
+                 lastSaved.y !== node.position.y
+        })
+
+        if (hasChanges) {
+          saveNodePositions(currentPositions)
+        }
+      }
+    }, 1000) // Save after 1 second of no changes
+
+    return () => clearTimeout(timeoutId)
+  }, [nodes, lastSavedPositions, saveNodePositions])
+
+  // Custom node change handler to track position changes
+  const onNodesChangeCustom = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes)
+    
+    // Check if any position changes occurred
+    const positionChanges = changes.filter(change => 
+      change.type === 'position' && change.position
+    )
+    
+    if (positionChanges.length > 0) {
+      // Positions changed, the useEffect will handle saving
     }
-  }
+  }, [onNodesChange])
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
+  const onConnect = useCallback(
+    (params: Connection) => {
+      const isStartToTask = params.sourceHandle === 'onExecute' && params.targetHandle === 'target';
+      if (isStartToTask) {
+        // Only allow one outgoing edge from the starting node
+        const alreadyExists = edges.some(
+          (e) => e.source === params.source && e.sourceHandle === 'onExecute'
+        );
+        if (alreadyExists) {
+          window.alert('The Start Workflow node can only have one outgoing connection.');
+          return;
+        }
+      }
+      if (params.source && params.target && params.sourceHandle && params.targetHandle) {
+        const newEdge: Edge = {
+          id: `${params.source}-${params.target}-${Date.now()}`,
+          source: params.source,
+          target: params.target,
+          sourceHandle: params.sourceHandle,
+          targetHandle: params.targetHandle,
+          type: 'smoothstep',
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+            color: params.sourceHandle === 'onFailure' ? '#ef4444' : '#10b981',
+          },
+          style: { 
+            stroke: params.sourceHandle === 'onFailure' ? '#ef4444' : '#10b981', 
+            strokeWidth: 2 
+          },
+          label: isStartToTask ? 'On Trigger' : undefined,
+          labelStyle: isStartToTask
+            ? { fill: '#10b981', fontWeight: 600 }
+            : undefined,
+          labelBgStyle: isStartToTask
+            ? { fill: '#ffffff', fillOpacity: 0.8 }
+            : undefined,
+        }
+        setEdges((eds) => addEdge(newEdge, eds))
+      }
+    },
+    [setEdges, edges]
+  )
 
-  const handleNodeClick = (node: WorkflowNode) => {
-    const task = tasks.find(t => t.id === node.taskId)
-    setSelectedTask(task || null)
-  }
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node<NodeData>) => {
+    setSelectedNode(node)
+  }, [])
 
-  const handleDeleteNode = async (nodeId: string) => {
+  const addTaskNode = useCallback(async () => {
+    try {
+      const newNode = await apiService.createWorkflowNode(workflowId, {
+        name: 'New Task',
+        type: 'http',
+        configuration: '{}',
+        positionX: 650,
+        positionY: 200 + Math.random() * 200,
+        isActive: true,
+        connections: []
+      })
+      
+      // Add the new node to the local state
+      const reactFlowNode: Node<NodeData> = {
+        id: newNode.id,
+        type: 'taskNode',
+        position: { x: newNode.positionX, y: newNode.positionY },
+        data: {
+          label: newNode.name,
+          type: newNode.type,
+          description: `Task ${newNode.name}`,
+          isActive: newNode.isActive,
+          config: newNode.configuration ? JSON.parse(newNode.configuration) : {}, // Add config
+        },
+      }
+      
+      setNodes((nds) => [...nds, reactFlowNode])
+    } catch (error) {
+      console.error('Failed to create new task:', error)
+      setError('Failed to create new task. Please try again.')
+    }
+  }, [workflowId, setNodes])
+
+  const deleteNode = useCallback(async (nodeId: string) => {
     try {
       await apiService.deleteWorkflowNode(workflowId, nodeId)
-      setWorkflowNodes(prev => prev.filter(node => node.id !== nodeId))
-      setConnections(prev => prev.filter(conn => 
-        conn.sourceNodeId !== nodeId && conn.targetNodeId !== nodeId
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId))
+      setEdges((eds) => eds.filter((edge) => 
+        edge.source !== nodeId && edge.target !== nodeId
       ))
-      setSelectedTask(null)
-    } catch (err) {
-      console.error('Failed to delete workflow node:', err)
-      setError('Failed to delete workflow node. Please try again.')
+      setSelectedNode(null)
+    } catch (error) {
+      console.error('Failed to delete node:', error)
+      setError('Failed to delete node. Please try again.')
     }
-  }
+  }, [workflowId, setNodes, setEdges])
 
-  const handleSetStartingNode = async (nodeId: string) => {
+  const saveNodeConfig = useCallback(async (nodeId: string, label: string, config: any) => {
     try {
-      await apiService.setStartingNode(workflowId, nodeId)
-      setWorkflowNodes(prev => prev.map(node => ({
-        ...node,
-        isStartingNode: node.id === nodeId
-      })))
-    } catch (err) {
-      console.error('Failed to set starting node:', err)
-      setError('Failed to set starting node. Please try again.')
+      await apiService.updateWorkflowNode(workflowId, nodeId, { name: label, configuration: JSON.stringify(config) })
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === nodeId
+            ? { ...node, data: { ...node.data, label: label, config: config } }
+            : node
+        )
+      )
+      setEditNode(null) // Close modal
+    } catch (error) {
+      console.error('Failed to save node config:', error)
+      setError('Failed to save node config. Please try again.')
+    }
+  }, [workflowId, setNodes])
+
+  // Drag-and-drop logic
+  const dragTaskType = useRef<string | null>(null)
+
+  // Helper: Default configs for each type
+  const TASK_TYPE_CONFIGS: Record<string, { label: string; type: string; icon: JSX.Element; config: any; description: string }> = {
+    HttpCallout: {
+      label: 'HTTP Callout',
+      type: 'HttpCallout',
+      icon: <Globe className="h-5 w-5 text-blue-500" />,
+      config: {
+        Method: 'GET',
+        Url: 'https://api.example.com/endpoint',
+        TimeoutSeconds: 30,
+        ContentType: 'application/json',
+        Headers: {},
+        Authentication: { Type: 'none' }
+      },
+      description: 'Call external APIs via HTTP(S)'
+    },
+    ScriptExecution: {
+      label: 'Data Process (Bash Script)',
+      type: 'ScriptExecution',
+      icon: <Code className="h-5 w-5 text-purple-500" />,
+      config: {
+        Language: 'bash',
+        Script: "#!/bin/bash\necho 'Hello World'",
+        TimeoutSeconds: 30,
+        OutputFormat: 'json'
+      },
+      description: 'Run a Bash script for data processing'
+    },
+    StoragePush: {
+      label: 'Data Load (Push to SFTP)',
+      type: 'StoragePush',
+      icon: <UploadCloud className="h-5 w-5 text-green-500" />,
+      config: {
+        DestinationType: 'SFTP',
+        Host: 'sftp.example.com',
+        Port: 22,
+        Username: 'user',
+        Password: '',
+        RemotePath: '/upload/path/'
+      },
+      description: 'Push data to SFTP server'
+    },
+    Conditional: {
+      label: 'Conditional',
+      type: 'Conditional',
+      icon: <HelpCircle className="h-5 w-5 text-yellow-500" />,
+      config: {
+        Expression: 'x > 0',
+        TrueBranch: [],
+        FalseBranch: []
+      },
+      description: 'Branch workflow based on a condition'
+    },
+    Split: {
+      label: 'Split',
+      type: 'Split',
+      icon: <GitBranch className="h-5 w-5 text-pink-500" />,
+      config: {
+        Branches: 2
+      },
+      description: 'Split execution into multiple branches'
+    },
+    Iteration: {
+      label: 'Iteration',
+      type: 'Iteration',
+      icon: <Repeat className="h-5 w-5 text-blue-400" />,
+      config: {
+        Collection: 'items',
+        Iterator: 'item'
+      },
+      description: 'Repeat a set of tasks for each item in a collection'
+    },
+    Merge: {
+      label: 'Merge',
+      type: 'Merge',
+      icon: <GitMerge className="h-5 w-5 text-gray-500" />,
+      config: {},
+      description: 'Merge multiple branches back together'
+    },
+    Delay: {
+      label: 'Delay',
+      type: 'Delay',
+      icon: <Clock className="h-5 w-5 text-orange-500" />,
+      config: {
+        DurationSeconds: 10
+      },
+      description: 'Pause the workflow for a specified duration'
+    },
+    Batch: {
+      label: 'Batch',
+      type: 'Batch',
+      icon: <Shuffle className="h-5 w-5 text-red-500" />,
+      config: {
+        Tasks: []
+      },
+      description: 'Run multiple tasks in parallel or sequentially'
+    },
+    Parallel: {
+      label: 'Parallel',
+      type: 'Parallel',
+      icon: <Shuffle className="h-5 w-5 text-purple-500" />,
+      config: {
+        Tasks: []
+      },
+      description: 'Run multiple tasks in parallel'
+    },
+    DataTransformation: {
+      label: 'Data Transformation',
+      type: 'DataTransformation',
+      icon: <Code className="h-5 w-5 text-teal-500" />,
+      config: {
+        Script: '// This is a placeholder for a data transformation script',
+        Language: 'javascript'
+      },
+      description: 'Apply complex data transformations using a scripting language'
     }
   }
 
-  const handleNodeDragStart = (node: WorkflowNode) => {
-    setDraggedNode(node)
-    setIsDragging(true)
-  }
+  // Define categories for the palette
+  const TASK_CATEGORIES: { label: string; key: string; tasks: string[] }[] = [
+    { label: 'Integration', key: 'integration', tasks: ['HttpCallout', 'StoragePush', 'Notification'] },
+    { label: 'Data', key: 'data', tasks: ['ScriptExecution', 'DataTransformation'] },
+    { label: 'Control', key: 'control', tasks: ['Conditional', 'Split', 'Iteration', 'Merge', 'Delay', 'Batch', 'Parallel'] },
+  ];
 
-  const handleNodeDragEnd = async (nodeId: string, info: PanInfo) => {
-    if (draggedNode) {
-      const newPosition = {
-        x: draggedNode.position.x + info.offset.x / zoom,
-        y: draggedNode.position.y + info.offset.y / zoom
-      }
-      
+  // Drag events
+  const onDragStart = (type: string) => (e: React.DragEvent) => {
+    dragTaskType.current = type
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const onDragEnd = () => { dragTaskType.current = null }
+
+  // React Flow drop handler
+  const onDrop = useCallback(
+    async (event: React.DragEvent) => {
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const x = event.clientX - bounds.left;
+      const y = event.clientY - bounds.top;
+      const flowPosition = reactFlowInstance?.project({ x, y }) ?? { x, y }; // Use React Flow's project
+      const type = dragTaskType.current;
+      if (!type) return;
+      const def = TASK_TYPE_CONFIGS[type];
       try {
-        const updateRequest: UpdateWorkflowNodeRequest = {
-          position: newPosition
-        }
-        
-        await apiService.updateWorkflowNode(workflowId, nodeId, updateRequest)
-        setWorkflowNodes(prev => prev.map(node => 
-          node.id === nodeId 
-            ? { ...node, position: newPosition }
-            : node
-        ))
-      } catch (err) {
-        console.error('Failed to update node position:', err)
-        setError('Failed to update node position. Please try again.')
+        const newNode = await apiService.createWorkflowNode(workflowId, {
+          name: def.label,
+          type: def.type,
+          configuration: JSON.stringify(def.config),
+          positionX: flowPosition.x,
+          positionY: flowPosition.y,
+          isActive: true,
+          connections: []
+        });
+        const reactFlowNode: Node<NodeData> = {
+          id: newNode.id,
+          type: 'taskNode',
+          position: { x: newNode.positionX, y: newNode.positionY },
+          data: {
+            label: newNode.name,
+            type: newNode.type,
+            description: def.description,
+            isActive: newNode.isActive,
+            config: newNode.configuration ? JSON.parse(newNode.configuration) : {},
+          },
+        };
+        setNodes((nds) => [...nds, reactFlowNode]);
+      } catch (error) {
+        setError('Failed to create new task. Please try again.');
       }
+    },
+    [workflowId, setNodes, reactFlowInstance]
+  );
+
+  const handleFullscreen = () => {
+    if (!document.fullscreenElement && studioRef.current) {
+      studioRef.current.requestFullscreen();
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen();
     }
-    
-    setDraggedNode(null)
-    setIsDragging(false)
-  }
-
-  const handleConnectionStart = (nodeId: string) => {
-    setConnectingNode(nodeId)
-  }
-
-  const handleRemoveConnection = async (connectionId: string) => {
-    try {
-      const connection = connections.find(c => c.id === connectionId)
-      if (connection) {
-        await apiService.removeConnection(workflowId, connection.sourceNodeId, connection.targetNodeId)
-        setConnections(prev => prev.filter(c => c.id !== connectionId))
-        setWorkflowNodes(prev => prev.map(node => 
-          node.id === connection.sourceNodeId
-            ? { ...node, connections: node.connections.filter(c => c !== connection.targetNodeId) }
-            : node
-        ))
-      }
-    } catch (err) {
-      console.error('Failed to remove connection:', err)
-      setError('Failed to remove connection. Please try again.')
-    }
-  }
-
-  // Zoom and pan handlers
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev * 1.2, 3))
-  }
-
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev / 1.2, 0.3))
-  }
-
-  const handleResetZoom = () => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-  }
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? 0.9 : 1.1
-    const newZoom = Math.max(0.3, Math.min(3, zoom * delta))
-    
-    if (canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      const mouseX = e.clientX - rect.left
-      const mouseY = e.clientY - rect.top
-      
-      const zoomRatio = newZoom / zoom
-      const newPanX = mouseX - (mouseX - pan.x) * zoomRatio
-      const newPanY = mouseY - (mouseY - pan.y) * zoomRatio
-      
-      setZoom(newZoom)
-      setPan({ x: newPanX, y: newPanY })
-    }
-  }, [zoom, pan])
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 0 && !isDragging) { // Left mouse button
-      setIsPanning(true)
-      setLastMousePos({ x: e.clientX, y: e.clientY })
-      if (e.currentTarget instanceof HTMLElement) {
-        e.currentTarget.style.cursor = 'grabbing'
-      }
-    }
-  }, [isDragging])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isPanning && !isDragging) {
-      const deltaX = e.clientX - lastMousePos.x
-      const deltaY = e.clientY - lastMousePos.y
-      
-      setPan(prev => ({
-        x: prev.x + deltaX,
-        y: prev.y + deltaY
-      }))
-      
-      setLastMousePos({ x: e.clientX, y: e.clientY })
-    }
-  }, [isPanning, isDragging, lastMousePos])
-
-  const handleMouseUp = useCallback(() => {
-    if (isPanning) {
-      setIsPanning(false)
-      if (canvasRef.current) {
-        canvasRef.current.style.cursor = 'grab'
-      }
-    }
-  }, [isPanning])
-
-  const getNodePosition = (node: WorkflowNode) => {
-    return {
-      x: node.position.x * zoom + pan.x,
-      y: node.position.y * zoom + pan.y
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span className="text-lg">Loading workflow studio...</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="text-red-500 mb-4">{error}</div>
-          <Button onClick={loadWorkflowData} variant="outline">
-            Try Again
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  };
 
   return (
-    <div className="h-full flex">
-      {/* Task Palette */}
-      <div className="w-64 bg-white/50 dark:bg-slate-800/50 backdrop-blur-xl border-r border-white/20 dark:border-slate-700/50 p-4">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold dark:text-white mb-2">Task Palette</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Drag tasks to the canvas to build your workflow
-          </p>
-        </div>
-        
-        <div className="space-y-2">
-          {availableTasks.map((task) => (
-            <motion.div
-              key={task.id}
-              draggable
-              onDragStart={() => handleDragStart(task)}
-              onDragEnd={handleDragEnd}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={`p-3 rounded-lg border border-gray-200 dark:border-gray-700 cursor-grab active:cursor-grabbing ${task.bgColor} hover:shadow-md transition-all duration-200 hover:border-blue-300 dark:hover:border-blue-600 ${
-                task.id === 'start' ? 'border-green-300 dark:border-green-600' : ''
-              }`}
+    <div
+      ref={studioRef}
+      className="h-screen flex flex-col relative"
+      style={{
+        backgroundColor: isDark ? '#18181b' : '#fff',
+        transition: 'background 0.2s',
+      }}
+    >
+      {/* Fullscreen button, always in top-right */}
+      {/* Removed absolute fullscreen button */}
+      {/* Toolbar */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 z-20">
+        <div className="flex items-center space-x-2">
+          <Button size="sm" onClick={addTaskNode} disabled={loading} className="hidden">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Task
+          </Button>
+          {selectedNode && selectedNode.id !== 'start' && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => deleteNode(selectedNode.id)}
+              disabled={loading}
             >
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-lg ${task.bgColor}`}>
-                  <task.icon className={`h-4 w-4 ${task.color}`} />
-                </div>
-                <div className="flex-1">
-                  <div className="font-medium text-sm dark:text-white">{task.name}</div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">{task.description}</div>
-                </div>
-                {task.id === 'start' && (
-                  <Star className="h-3 w-3 text-green-500" />
-                )}
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center space-x-2">
+          <Badge variant="outline">Nodes: {nodes.length}</Badge>
+          <Badge variant="outline">Connections: {edges.length}</Badge>
+          {saving && (
+            <Badge variant="outline" className="flex items-center">
+              <Loader2 className="h-3 w-3 mr-1" />
+              Saving...
+            </Badge>
+          )}
+          {loading && (
+            <Badge variant="outline" className="flex items-center">
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              Loading...
+            </Badge>
+          )}
+          <button
+            className="bg-white dark:bg-gray-900 rounded-full shadow p-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+            onClick={handleFullscreen}
+            aria-label="Fullscreen"
+            type="button"
+          >
+            <Maximize2 className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg m-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-red-700 dark:text-red-300">{error}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Main Studio Area */}
+      <div className="flex flex-1 min-h-0 relative h-full">
+        {/* Canvas */}
+        <div
+          className="flex-1 relative h-full"
+          onDrop={onDrop}
+          onDragOver={e => e.preventDefault()}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="text-lg ml-2">Loading workflow...</span>
+            </div>
+          ) : (
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChangeCustom}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              proOptions={{ hideAttribution: true }}
+              defaultEdgeOptions={{
+                type: 'smoothstep',
+                animated: true,
+                style: {
+                  stroke: '#666',
+                  strokeWidth: 3,
+                },
+              }}
+              fitView
+              attributionPosition="bottom-left"
+              onInit={setReactFlowInstance}
+              onEdgeUpdate={(oldEdge, newConnection) => {
+                // Only allow one outgoing edge from the Start node
+                if (
+                  oldEdge.sourceHandle === 'onExecute' &&
+                  edges.filter(e => e.source === oldEdge.source && e.sourceHandle === 'onExecute').length > 1
+                ) {
+                  window.alert('The Start Workflow node can only have one outgoing connection.');
+                  return;
+                }
+                setEdges((eds) =>
+                  eds.map((e) =>
+                    e.id === oldEdge.id
+                      ? {
+                          ...e,
+                          target: newConnection.target,
+                          targetHandle: newConnection.targetHandle,
+                          label: oldEdge.sourceHandle === 'onExecute' ? 'On Trigger' : e.label,
+                        }
+                      : e
+                  )
+                );
+              }}
+            >
+              <Background />
+              <Controls />
+              <MiniMap />
+            </ReactFlow>
+          )}
+        </div>
+        {/* Task Palette Sidebar */}
+        <div className="w-64 p-4 h-full flex flex-col border-l border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white/90 to-gray-50/80 dark:from-gray-900/90 dark:to-gray-800/80 gap-4 z-10 overflow-y-auto">
+          <h4 className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Add Task</h4>
+          {TASK_CATEGORIES.map(category => (
+            <div key={category.key} className="mb-4">
+              <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 pl-1">{category.label}</div>
+              <div className="flex flex-col gap-2">
+                {category.tasks.map(taskKey => {
+                  const def = TASK_TYPE_CONFIGS[taskKey];
+                  if (!def) return null;
+                  return (
+                    <div
+                      key={taskKey}
+                      draggable
+                      onDragStart={onDragStart(taskKey)}
+                      onDragEnd={onDragEnd}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-800/70 shadow-sm cursor-grab hover:shadow-md transition-all select-none"
+                      title={def.description}
+                    >
+                      {def.icon}
+                      <div>
+                        <div className="font-medium text-sm text-gray-900 dark:text-white">{def.label}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{def.description}</div>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 relative">
-        {/* Zoom Controls */}
-        <div className="absolute top-4 right-4 z-10 flex items-center space-x-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl rounded-lg p-2 shadow-lg">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomOut}
-            disabled={zoom <= 0.3}
-            className="h-8 w-8 p-0"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium dark:text-white min-w-[3rem] text-center">
-            {Math.round(zoom * 100)}%
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomIn}
-            disabled={zoom >= 3}
-            className="h-8 w-8 p-0"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetZoom}
-            className="h-8 w-8 p-0"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div
-          ref={canvasRef}
-          className="h-full bg-gradient-to-br from-blue-50/50 to-purple-50/50 dark:from-slate-900/50 dark:to-slate-800/50 relative overflow-hidden cursor-grab"
-          onDrop={handleCanvasDrop}
-          onDragOver={handleDragOver}
-          onWheel={handleWheel}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-        >
-          {/* Grid Pattern */}
-          <div 
-            className="absolute inset-0 opacity-20"
-            style={{
-              backgroundImage: `
-                linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)
-              `,
-              backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
-              transform: `translate(${pan.x}px, ${pan.y}px)`
-            }}
-          />
-
-          {/* SVG for Connections */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` }}>
-            {connections.map((connection) => {
-              const sourceNode = workflowNodes.find(n => n.id === connection.sourceNodeId)
-              const targetNode = workflowNodes.find(n => n.id === connection.targetNodeId)
-              
-              if (!sourceNode || !targetNode) return null
-              
-              const sourcePos = sourceNode.position
-              const targetPos = targetNode.position
-              
-              return (
-                <g key={connection.id}>
-                  <path
-                    d={`M ${sourcePos.x} ${sourcePos.y} L ${targetPos.x} ${targetPos.y}`}
-                    stroke={connectingNode === connection.sourceNodeId ? "#3b82f6" : "#6b7280"}
-                    strokeWidth="2"
-                    fill="none"
-                    markerEnd="url(#arrowhead)"
-                    className="transition-colors duration-200"
-                  />
-                  <circle
-                    cx={sourcePos.x}
-                    cy={sourcePos.y}
-                    r="4"
-                    fill="#3b82f6"
-                    className="cursor-pointer"
-                    onClick={() => handleRemoveConnection(connection.id)}
-                  />
-                </g>
-              )
-            })}
-            
-            {/* Arrow marker definition */}
-            <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="10"
-                markerHeight="7"
-                refX="9"
-                refY="3.5"
-                orient="auto"
-              >
-                <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
-              </marker>
-            </defs>
-          </svg>
-
-          {/* Workflow Nodes */}
-          {workflowNodes.map((node) => {
-            const task = tasks.find(t => t.id === node.taskId)
-            if (!task) return null
-
-            const position = getNodePosition(node)
-
-            return (
-              <motion.div
-                key={node.id}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                drag
-                dragMomentum={false}
-                dragElastic={0}
-                onDragStart={() => handleNodeDragStart(node)}
-                onDragEnd={(_, info) => handleNodeDragEnd(node.id, info)}
-                className="absolute cursor-move"
-                style={{
-                  left: position.x,
-                  top: position.y,
-                  transform: 'translate(-50%, -50%)',
-                  zIndex: connectingNode === node.id ? 10 : 1
-                }}
-                onClick={() => handleNodeClick(node)}
-              >
-                <Card className={`w-48 border-2 ${
-                  node.isStartingNode 
-                    ? 'border-green-200 dark:border-green-700 bg-green-50/90 dark:bg-green-900/90' 
-                    : connectingNode === node.id
-                    ? 'border-blue-300 dark:border-blue-600 bg-blue-50/90 dark:bg-blue-900/90'
-                    : 'border-blue-200 dark:border-blue-700 bg-white/90 dark:bg-slate-800/90'
-                } backdrop-blur-xl shadow-lg hover:shadow-xl transition-all duration-200`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className={`p-2 rounded-lg ${task.bgColor}`}>
-                          <task.icon className={`h-4 w-4 ${task.color}`} />
-                        </div>
-                        <CardTitle className="text-sm dark:text-white">{task.name}</CardTitle>
-                        {node.isStartingNode && (
-                          <Star className="h-3 w-3 text-green-500" />
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteNode(node.id)
-                        }}
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{task.description}</p>
-                    <div className="mt-2 flex space-x-1">
-                      <Badge variant="outline" className="text-xs border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400">Node</Badge>
-                      <Badge variant="outline" className="text-xs border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400">{task.type}</Badge>
-                      {node.isStartingNode && (
-                        <Badge variant="outline" className="text-xs border-green-200 dark:border-green-700 text-green-600 dark:text-green-400">Start</Badge>
-                      )}
-                    </div>
-                    <div className="mt-2 flex space-x-1">
-                      {!node.isStartingNode && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleSetStartingNode(node.id)
-                          }}
-                          className="text-xs text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-                        >
-                          <Star className="h-3 w-3 mr-1" />
-                          Set as Start
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleConnectionStart(node.id)
-                        }}
-                        className={`text-xs ${
-                          connectingNode === node.id
-                            ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                            : 'text-gray-600 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900/20'
-                        }`}
-                      >
-                        <Settings className="h-3 w-3 mr-1" />
-                        Connect
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )
-          })}
-
-          {/* Drop Zone Indicator */}
-          {draggedTask && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center p-8 border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg bg-blue-50/50 dark:bg-blue-900/20 backdrop-blur-sm">
-                <div className="text-blue-600 dark:text-blue-400 font-medium">
-                  Drop {draggedTask.name} here
-                </div>
-                <div className="text-sm text-blue-500 dark:text-blue-400 mt-1">
-                  Release to add to workflow
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Connection Mode Indicator */}
-          {connectingNode && (
-            <div className="absolute top-4 left-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg">
-              <div className="flex items-center space-x-2">
-                <Settings className="h-4 w-4" />
-                <span>Click on a node to connect</span>
-              </div>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {workflowNodes.length === 0 && !draggedTask && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-gray-400 dark:text-gray-500 mb-4">
-                  <Workflow className="h-16 w-16 mx-auto" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">
-                  Empty Workflow
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  Drag tasks from the palette to start building your workflow
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Properties Panel */}
-      {selectedTask && (
-        <div className="w-80 bg-white/50 dark:bg-slate-800/50 backdrop-blur-xl border-l border-white/20 dark:border-slate-700/50 p-4">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold dark:text-white mb-2">Task Properties</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Configure the selected task
-            </p>
-          </div>
-          
-          <div className="space-y-4">
+      {/* Node Properties Panel */}
+      {selectedNode && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <h3 className="font-semibold mb-2">Node Properties</h3>
+          <div className="space-y-2">
             <div>
-              <label className="block text-sm font-medium dark:text-white mb-1">Task Name</label>
+              <label className="text-sm font-medium">Name</label>
               <input
                 type="text"
-                defaultValue={selectedTask.name}
-                className="w-full p-2 rounded-md bg-white/50 dark:bg-gray-700/50 backdrop-blur-xl border border-gray-300 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={selectedNode.data.label}
+                onChange={(e) => {
+                  setNodes((nds) =>
+                    nds.map((node) =>
+                      node.id === selectedNode.id
+                        ? { ...node, data: { ...node.data, label: e.target.value } }
+                        : node
+                    )
+                  )
+                }}
+                className="w-full p-2 border rounded-md"
               />
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium dark:text-white mb-1">Description</label>
-              <textarea
-                defaultValue={selectedTask.description}
-                rows={3}
-                className="w-full p-2 rounded-md bg-white/50 dark:bg-gray-700/50 backdrop-blur-xl border border-gray-300 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium dark:text-white mb-1">Type</label>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="text-xs border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400">{selectedTask.type}</Badge>
+            {selectedNode.type === 'taskNode' && (
+              <div>
+                <label className="text-sm font-medium">Type</label>
+                <select
+                  value={selectedNode.data.type}
+                  onChange={(e) => {
+                    setNodes((nds) =>
+                      nds.map((node) =>
+                        node.id === selectedNode.id
+                          ? { ...node, data: { ...node.data, type: e.target.value } }
+                          : node
+                      )
+                    )
+                  }}
+                  className="w-full p-2 border rounded-md"
+                >
+                  <option value="HttpCallout">HTTP Callout</option>
+                  <option value="ScriptExecution">Data Process (Bash Script)</option>
+                  <option value="StoragePush">Data Load (Push to SFTP)</option>
+                </select>
               </div>
-            </div>
-            
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button size="sm" className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white">
-                <Settings className="h-4 w-4 mr-2" />
-                Configure Task
-              </Button>
-            </div>
+            )}
           </div>
         </div>
       )}
+
+      {/* Edit Node Modal */}
+      <Dialog open={!!editNode} onOpenChange={open => { if (!open) setEditNode(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Node</DialogTitle>
+            <DialogDescription>Update the configuration for this node.</DialogDescription>
+          </DialogHeader>
+          {/* Dynamic config form based on node type */}
+          {editNode && (
+            <form onSubmit={e => { e.preventDefault(); saveNodeConfig(editNode.id, editLabel, editConfig); setEditNode(null); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <input
+                  className="w-full p-2 border rounded"
+                  value={editLabel}
+                  onChange={e => setEditLabel(e.target.value)}
+                />
+              </div>
+              {/* Example for Delay */}
+              {editNode.data.type === 'Delay' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Duration (seconds)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border rounded"
+                    value={editConfig?.DurationSeconds || 60}
+                    min={1}
+                    onChange={e => setEditConfig({ ...editConfig, DurationSeconds: parseInt(e.target.value) })}
+                  />
+                </div>
+              )}
+              {/* Add more type-specific fields here */}
+              <DialogFooter>
+                <button type="submit" className="btn btn-primary">Save</button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

@@ -14,10 +14,12 @@ public record CreateWorkflowCommand : IRequest<Guid>
 public class CreateWorkflowCommandHandler : IRequestHandler<CreateWorkflowCommand, Guid>
 {
     private readonly IWorkflowRepository _workflowRepository;
+    private readonly IApplicationDbContext _context;
 
-    public CreateWorkflowCommandHandler(IWorkflowRepository workflowRepository)
+    public CreateWorkflowCommandHandler(IWorkflowRepository workflowRepository, IApplicationDbContext context)
     {
         _workflowRepository = workflowRepository;
+        _context = context;
     }
 
     public async Task<Guid> Handle(CreateWorkflowCommand request, CancellationToken cancellationToken)
@@ -26,6 +28,15 @@ public class CreateWorkflowCommandHandler : IRequestHandler<CreateWorkflowComman
         workflow.SetCreatedBy(request.CreatedBy);
 
         var createdWorkflow = await _workflowRepository.AddAsync(workflow, cancellationToken);
+        
+        // Create a default starting node for the new workflow
+        var startingNode = new WorkflowSystem.Domain.Entities.Task("Start Workflow", "start", "{}", 0, 0);
+        startingNode.SetActive(true);
+        startingNode.SetWorkflow(createdWorkflow);
+        
+        _context.Tasks.Add(startingNode);
+        await _context.SaveChangesAsync(cancellationToken);
+        
         return createdWorkflow.Id;
     }
 } 

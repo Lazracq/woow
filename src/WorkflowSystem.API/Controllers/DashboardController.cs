@@ -12,6 +12,8 @@ namespace WorkflowSystem.API.Controllers
         [HttpGet("stats")]
         public async Task<IActionResult> GetDashboardStats()
         {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
             // For now, return sample data
             var stats = new
             {
@@ -33,45 +35,86 @@ namespace WorkflowSystem.API.Controllers
         [HttpGet("notifications")]
         public async Task<IActionResult> GetNotifications()
         {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
             // For now, return sample notifications
-            var notifications = new List<object>
+            var notifications = new[]
             {
                 new
                 {
-                    id = "1",
-                    title = "Workflow Completed",
-                    message = "Data Processing Pipeline completed successfully",
-                    type = "success",
-                    timestamp = DateTime.UtcNow.AddMinutes(-5).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    id = "notif-1",
+                    type = "info",
+                    title = "System Update",
+                    message = "Workflow system updated to version 2.1.0",
+                    timestamp = DateTime.UtcNow.AddHours(-2).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                     read = false
                 },
                 new
                 {
-                    id = "2",
-                    title = "System Alert",
-                    message = "High CPU usage detected",
+                    id = "notif-2",
                     type = "warning",
-                    timestamp = DateTime.UtcNow.AddMinutes(-15).ToString("yyyy-MM-ddTHH:mm:ssZ"),
-                    read = true
-                },
-                new
-                {
-                    id = "3",
-                    title = "New Workflow Created",
-                    message = "Email Notification System workflow created",
-                    type = "info",
+                    title = "High CPU Usage",
+                    message = "System CPU usage is above 80%",
                     timestamp = DateTime.UtcNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm:ssZ"),
                     read = false
+                },
+                new
+                {
+                    id = "notif-3",
+                    type = "success",
+                    title = "Backup Completed",
+                    message = "Daily backup completed successfully",
+                    timestamp = DateTime.UtcNow.AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                    read = true
                 }
             };
 
             return Ok(notifications);
         }
 
+        [HttpGet("recent-activity")]
+        public async Task<IActionResult> GetRecentActivity()
+        {
+            await Task.CompletedTask; // Placeholder for future implementation
+            
+            // For now, return sample recent activity
+            var activities = new[]
+            {
+                new
+                {
+                    id = "act-1",
+                    type = "workflow_created",
+                    user = "john.doe@example.com",
+                    workflow = "Data Processing Pipeline",
+                    timestamp = DateTime.UtcNow.AddMinutes(-15).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                },
+                new
+                {
+                    id = "act-2",
+                    type = "execution_completed",
+                    user = "system",
+                    workflow = "Email Notification System",
+                    timestamp = DateTime.UtcNow.AddMinutes(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                },
+                new
+                {
+                    id = "act-3",
+                    type = "workflow_updated",
+                    user = "jane.smith@example.com",
+                    workflow = "File Backup Workflow",
+                    timestamp = DateTime.UtcNow.AddHours(-1).ToString("yyyy-MM-ddTHH:mm:ssZ")
+                }
+            };
+
+            return Ok(activities);
+        }
+
         [HttpPost("refresh")]
         public async Task<IActionResult> RefreshDashboard()
         {
-            // For now, just return success
+            await Task.CompletedTask; // Placeholder for future implementation
+            
+            // For now, return success
             return Ok(new { message = "Dashboard refreshed successfully" });
         }
     }

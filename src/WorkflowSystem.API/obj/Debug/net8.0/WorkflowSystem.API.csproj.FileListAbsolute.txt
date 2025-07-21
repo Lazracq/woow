@@ -147,3 +147,4 @@
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.API/bin/Debug/net8.0/Quartz.Plugins.dll
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.API/bin/Debug/net8.0/Quartz.Plugins.TimeZoneConverter.dll
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.API/bin/Debug/net8.0/TimeZoneConverter.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.API/obj/Debug/net8.0/WorkflowSystem.API.sourcelink.json

@@ -6,7 +6,7 @@ namespace WorkflowSystem.Domain.Entities;
 
 public class Task : BaseEntity
 {
-    public Task(string name, string type, string configuration, int positionX = 0, int positionY = 0)
+    public Task(string name, string type, string configuration, double positionX = 0, double positionY = 0)
     {
         Name = name;
         Type = type;
@@ -26,9 +26,9 @@ public class Task : BaseEntity
     [Required]
     public string Configuration { get; private set; }
 
-    public int PositionX { get; private set; }
+    public double PositionX { get; private set; }
 
-    public int PositionY { get; private set; }
+    public double PositionY { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -67,7 +67,7 @@ public class Task : BaseEntity
         Configuration = configuration;
     }
 
-    public void UpdatePosition(int positionX, int positionY)
+    public void UpdatePosition(double positionX, double positionY)
     {
         PositionX = positionX;
         PositionY = positionY;

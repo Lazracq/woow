@@ -13,3 +13,4 @@
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/refint/WorkflowSystem.Application.dll
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.pdb
 /Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/ref/WorkflowSystem.Application.dll
+/Users/zinebbouayad/Projects/woow/src/WorkflowSystem.Application/obj/Debug/net8.0/WorkflowSystem.Application.sourcelink.json
