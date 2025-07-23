@@ -6,6 +6,7 @@ using WorkflowSystem.Application.Workflows.Queries.GetWorkflowById;
 using WorkflowSystem.Application.Workflows.Queries.GetWorkflowNodes;
 using WorkflowSystem.Application.Workflows.Commands.UpdateWorkflowNode;
 using WorkflowSystem.Application.Workflows.Commands.CreateWorkflowNode;
+using WorkflowSystem.Application.Workflows.Commands.DeleteWorkflowNode;
 
 namespace WorkflowSystem.API.Controllers
 {
@@ -279,6 +280,38 @@ namespace WorkflowSystem.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { error = "Failed to batch update node positions", message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{workflowId}/nodes/{nodeId}")]
+        public async Task<IActionResult> DeleteWorkflowNode(string workflowId, string nodeId)
+        {
+            try
+            {
+                if (!Guid.TryParse(workflowId, out var workflowGuid))
+                {
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
+                if (!Guid.TryParse(nodeId, out var nodeGuid))
+                {
+                    return BadRequest(new { error = "Invalid node ID format" });
+                }
+
+                var command = new DeleteWorkflowNodeCommand
+                {
+                    WorkflowId = workflowGuid,
+                    NodeId = nodeGuid
+                };
+                await _mediator.Send(command);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to delete workflow node", message = ex.Message });
             }
         }
     }

@@ -47,13 +47,16 @@ public class GetWorkflowNodesQueryHandler : IRequestHandler<GetWorkflowNodesQuer
             try
             {
                 var config = task.GetConfiguration<dynamic>();
-                if (config != null && config.connections != null)
+                if (config != null)
                 {
-                    connections = ((System.Text.Json.JsonElement)config.connections)
-                        .EnumerateArray()
-                        .Select(x => x.GetString() ?? string.Empty)
-                        .Where(x => !string.IsNullOrEmpty(x))
-                        .ToList();
+                    if (config.connections is System.Text.Json.JsonElement elem && elem.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        connections = elem.EnumerateArray()
+                            .Where(x => x.ValueKind == System.Text.Json.JsonValueKind.String)
+                            .Select(x => x.GetString() ?? string.Empty)
+                            .Where(x => !string.IsNullOrEmpty(x))
+                            .ToList();
+                    }
                 }
             }
             catch

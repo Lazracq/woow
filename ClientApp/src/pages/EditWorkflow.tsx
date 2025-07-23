@@ -31,7 +31,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Workflow as WorkflowType } from '@/services/api'
 import { WorkflowStudio } from '@/components/WorkflowStudio'
 import { apiService } from '@/services/api'
-
+import { ReactFlowProvider } from 'reactflow';
 
 
 interface WorkflowTrigger {
@@ -747,7 +747,9 @@ export function EditWorkflow() {
           </div>
         ) : (
           <div className="h-[600px] bg-white/50 dark:bg-gray-800/50 backdrop-blur-xl border border-white/20 dark:border-gray-700/50 rounded-xl">
-            <WorkflowStudio workflowId={workflow?.id || ''} />
+            <ReactFlowProvider>
+              <WorkflowStudio workflowId={workflow?.id || ''} />
+            </ReactFlowProvider>
           </div>
         )}
       </motion.div>

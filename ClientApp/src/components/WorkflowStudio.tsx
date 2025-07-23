@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useReactFlow } from 'reactflow';
 import ReactFlow, {
   Edge,
   addEdge,
@@ -16,7 +17,7 @@ import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Trash2, Maximize2, Info } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { nodeTypes } from './nodeTypes';
 import { apiService } from '@/services/api';
 import { debounce } from 'lodash';
@@ -91,6 +92,7 @@ function isAuthType(obj: unknown): obj is { type: string } {
 }
 
 export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
+  const reactFlowInstance = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
@@ -425,7 +427,7 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
       const bounds = event.currentTarget.getBoundingClientRect();
       const x = event.clientX - bounds.left;
       const y = event.clientY - bounds.top;
-      const flowPosition = { x, y };
+      const flowPosition = reactFlowInstance.project({ x, y });
       const type = dragTaskType.current;
       if (!type) return;
       const def = TASK_TYPE_CONFIGS[type as keyof typeof TASK_TYPE_CONFIGS];
@@ -456,7 +458,7 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
         setError('Failed to create new task. Please try again.');
       }
     },
-    [workflowId, setNodes]
+    [workflowId, setNodes, reactFlowInstance]
   );
 
   // Fullscreen background fix
@@ -497,6 +499,22 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
     window.addEventListener('editNode', handler as EventListener);
     return () => window.removeEventListener('editNode', handler as EventListener);
   }, [nodes]);
+
+  // Listen for 'deleteNode' event to handle node deletion
+  React.useEffect(() => {
+    const handler = async (event: Event) => {
+      const customEvent = event as CustomEvent<{ id: string }>;
+      const nodeId = customEvent.detail.id;
+      try {
+        await apiService.deleteWorkflowNode(workflowId, nodeId);
+        setNodes(nds => nds.filter(n => n.id !== nodeId));
+      } catch {
+        setError('Failed to delete node.');
+      }
+    };
+    window.addEventListener('deleteNode', handler as EventListener);
+    return () => window.removeEventListener('deleteNode', handler as EventListener);
+  }, [workflowId, setNodes]);
 
   return (
     <>
@@ -628,22 +646,24 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
       {/* Edit Node Modal */}
       <Dialog open={!!editNode} onOpenChange={open => { if (!open) setEditNode(null); }}>
         <DialogContent className="p-0 bg-transparent border-none shadow-none">
-          <Card
-            className="w-full max-w-lg mx-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up"
-          >
-            <CardHeader className="pb-4 flex flex-col items-start gap-2 relative border-0">
+          <Card className="w-full max-w-lg mx-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up">
+            <CardHeader className="border-b border-gray-200 dark:border-gray-700 pb-4 flex flex-col items-start gap-2 relative border-0">
               <div className="flex items-center gap-3 w-full">
                 <div className="flex items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-300 p-2">
                   <Info className="h-6 w-6 text-blue-500" />
                 </div>
-                <CardTitle className="text-2xl font-extrabold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
-                  {editNode?.data?.type === 'start' || editNode?.id === 'start' ? 'Edit Starting Node' : editNode ? `Edit ${editNode?.data?.type || 'Node'}` : 'Edit Node'}
-                </CardTitle>
+                <DialogTitle asChild>
+                  <span className="text-2xl font-extrabold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
+                    {editNode?.data?.type === 'start' || editNode?.id === 'start' ? 'Edit Starting Node' : editNode ? `Edit ${editNode?.data?.type || 'Node'}` : 'Edit Node'}
+                  </span>
+                </DialogTitle>
               </div>
-              <CardDescription className="dark:text-gray-300 mt-1 ml-1">
-                Update the configuration for this node.
-              </CardDescription>
-              <div className="w-full h-px bg-gradient-to-r from-blue-400/60 via-blue-300/30 to-transparent mt-1" />
+              <DialogDescription asChild>
+                <span className="dark:text-gray-300 mt-1 ml-1">
+                  Update the configuration for this node.
+                </span>
+              </DialogDescription>
+              <div className="w-full h-px bg-gradient-to-r from-blue-400/60 via-blue-300/30 to-transparent mt-2" />
             </CardHeader>
             <CardContent className="py-4">
               <form
