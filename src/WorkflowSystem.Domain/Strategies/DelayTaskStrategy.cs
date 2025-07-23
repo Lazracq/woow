@@ -2,6 +2,7 @@ using System.Text.Json;
 using WorkflowSystem.Domain.Entities;
 using System.Threading.Tasks;
 using System.Threading;
+using TaskEntity = WorkflowSystem.Domain.Entities.Task;
 
 namespace WorkflowSystem.Domain.Strategies;
 
@@ -13,15 +14,15 @@ public class DelayTaskStrategy : ITaskStrategy
     public string Icon => "clock";
     public bool IsConfigurable => true;
 
-    public async Task<ExecutionStep> ExecuteAsync(Task task, ExecutionStep step, object? inputData, CancellationToken cancellationToken = default)
+    public async Task<ExecutionStep> ExecuteAsync(TaskEntity task, ExecutionStep step, object? inputData, CancellationToken cancellationToken = default)
     {
         try
         {
             step.Start();
             var config = task.GetConfiguration<DelayTaskConfiguration>();
-            int duration = config.DurationSeconds > 0 ? config.DurationSeconds : 1;
-            await Task.Delay(duration * 1000, cancellationToken);
-            step.SetOutputData($"Waited {duration} seconds");
+            int duration = config.DurationMilliseconds > 0 ? config.DurationMilliseconds : 1000;
+            await System.Threading.Tasks.Task.Delay(duration, cancellationToken);
+            step.SetOutputData($"Waited {duration} ms");
             step.Complete();
             return step;
         }
@@ -34,7 +35,7 @@ public class DelayTaskStrategy : ITaskStrategy
 
     public object GetDefaultConfiguration()
     {
-        return new DelayTaskConfiguration { DurationSeconds = 60 };
+        return new DelayTaskConfiguration { DurationMilliseconds = 1000, UserDescription = string.Empty };
     }
 
     public bool ValidateConfiguration(string configuration)
@@ -42,7 +43,7 @@ public class DelayTaskStrategy : ITaskStrategy
         try
         {
             var config = JsonSerializer.Deserialize<DelayTaskConfiguration>(configuration);
-            return config != null && config.DurationSeconds > 0;
+            return config != null && config.DurationMilliseconds > 0;
         }
         catch
         {
@@ -57,14 +58,18 @@ public class DelayTaskStrategy : ITaskStrategy
             ["type"] = "object",
             ["properties"] = new Dictionary<string, object>
             {
-                ["durationSeconds"] = new Dictionary<string, object>
+                ["durationMilliseconds"] = new Dictionary<string, object>
                 {
                     ["type"] = "integer",
                     ["minimum"] = 1,
-                    ["default"] = 60
+                    ["default"] = 1000
+                },
+                ["userDescription"] = new Dictionary<string, object>
+                {
+                    ["type"] = "string"
                 }
             },
-            ["required"] = new[] { "durationSeconds" }
+            ["required"] = new[] { "durationMilliseconds" }
         };
         return JsonSerializer.Serialize(schema);
     }
@@ -72,5 +77,6 @@ public class DelayTaskStrategy : ITaskStrategy
 
 public class DelayTaskConfiguration
 {
-    public int DurationSeconds { get; set; } = 60;
+    public int DurationMilliseconds { get; set; } = 1000;
+    public string? UserDescription { get; set; }
 } 

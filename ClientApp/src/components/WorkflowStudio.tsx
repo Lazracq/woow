@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ReactFlow, {
-  Node,
   Edge,
   addEdge,
   Connection,
@@ -9,326 +8,118 @@ import ReactFlow, {
   Controls,
   Background,
   MiniMap,
-  NodeTypes,
-  Handle,
-  Position,
   MarkerType,
   NodeChange,
-  useReactFlow,
-} from 'reactflow'
-import 'reactflow/dist/style.css'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Play,
-  Settings,
-  Plus,
-  Trash2,
-  Database,
-  Mail,
-  Globe,
-  Code,
-  Clock,
-  Loader2,
-  Maximize2,
-  Minimize2,
-  UploadCloud,
-  GitBranch,
-  Repeat,
-  Shuffle,
-  GitMerge,
-  HelpCircle,
-  Plug
-} from 'lucide-react'
-import { apiService } from '@/services/api'
-import { debounce } from 'lodash'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+  NodePositionChange,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Plus, Trash2, Maximize2, Info } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { nodeTypes } from './nodeTypes';
+import { apiService } from '@/services/api';
+import { debounce } from 'lodash';
+import { uniqBy } from 'lodash';
+import type { DelayTaskConfig, HttpCalloutTaskConfig, StartNodeConfig } from '@/services/api';
+import type { Node } from 'reactflow';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 interface NodeData {
-  label: string
-  type?: string
-  description?: string
-  isActive?: boolean
-  config?: any // Added for dynamic config
+  label: string;
+  type?: string;
+  description?: string;
+  isActive?: boolean;
+  config?: DelayTaskConfig | HttpCalloutTaskConfig | StartNodeConfig | Record<string, unknown>;
 }
 
 interface WorkflowStudioProps {
-  workflowId: string
+  workflowId: string;
 }
 
-// Custom Node Types
-const StartingNode = () => {
-  const [showStartModal, setShowStartModal] = useState(false);
-  return (
-    <Card className="w-64 border-2 border-green-500 bg-green-50 dark:bg-green-900/20 flex flex-col items-center justify-center relative">
-      <CardContent className="flex flex-col items-center justify-center py-8">
-        <button
-          className="flex flex-col items-center justify-center focus:outline-none group"
-          onClick={() => setShowStartModal(true)}
-          title="Start Workflow"
-        >
-          <Play className="h-16 w-16 text-green-600 group-hover:scale-110 transition-transform duration-150" />
-          <span className="mt-2 font-semibold text-lg text-green-700 dark:text-green-300">Start Workflow</span>
-        </button>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">Workflow starting point</p>
-        {/* Plug handle */}
-        <div style={{ position: 'absolute', right: -20, top: '50%', transform: 'translateY(-50%)', zIndex: 3, pointerEvents: 'none' }}>
-          <Plug className="text-green-600 dark:text-green-400" style={{ width: 32, height: 32 }} />
-        </div>
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="onExecute"
-          style={{
-            background: '#10b981',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 24,
-            height: 24,
-            border: '3px solid #10b981',
-            borderRadius: '50%',
-            zIndex: 2,
-            right: -12,
-          }}
-        />
-      </CardContent>
-      {/* Modal for execution confirmation */}
-      <Dialog open={showStartModal} onOpenChange={setShowStartModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Execute Workflow</DialogTitle>
-            <DialogDescription>Are you sure you want to start this workflow?</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowStartModal(false)}>Cancel</Button>
-            <Button className="bg-green-600 text-white" onClick={() => { setShowStartModal(false); /* TODO: trigger execution */ }}>Start</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
-  )
-}
-
-// Helper: Node type style map
-const NODE_TYPE_STYLES: Record<string, { border: string; bg: string; icon: JSX.Element }> = {
+const TASK_TYPE_CONFIGS = {
   HttpCallout: {
-    border: 'border-blue-500',
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    icon: <Globe className="h-4 w-4 text-blue-500" />,
-  },
-  ScriptExecution: {
-    border: 'border-purple-500',
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    icon: <Code className="h-4 w-4 text-purple-500" />,
-  },
-  StoragePush: {
-    border: 'border-green-500',
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    icon: <UploadCloud className="h-4 w-4 text-green-500" />,
-  },
-  Conditional: {
-    border: 'border-yellow-500',
-    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-    icon: <HelpCircle className="h-4 w-4 text-yellow-500" />,
-  },
-  Split: {
-    border: 'border-pink-500',
-    bg: 'bg-pink-50 dark:bg-pink-900/20',
-    icon: <GitBranch className="h-4 w-4 text-pink-500" />,
-  },
-  Iteration: {
-    border: 'border-blue-400',
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    icon: <Repeat className="h-4 w-4 text-blue-400" />,
-  },
-  Merge: {
-    border: 'border-gray-500',
-    bg: 'bg-gray-50 dark:bg-gray-900/20',
-    icon: <GitMerge className="h-4 w-4 text-gray-500" />,
+    label: 'HTTP Callout',
+    type: 'HttpCallout',
+    icon: <svg className="h-5 w-5 text-blue-500" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" /></svg>,
+    config: {
+      method: 'GET',
+      url: '',
+      timeoutSeconds: 30,
+      contentType: 'application/json',
+      headers: {},
+      authentication: { type: 'none' },
+      userDescription: ''
+    } as HttpCalloutTaskConfig,
+    description: 'Call external APIs via HTTP(S)',
+    category: 'Integration',
   },
   Delay: {
-    border: 'border-orange-500',
-    bg: 'bg-orange-50 dark:bg-orange-900/20',
-    icon: <Clock className="h-4 w-4 text-orange-500" />,
-  },
-  Batch: {
-    border: 'border-red-500',
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    icon: <Shuffle className="h-4 w-4 text-red-500" />,
-  },
-  Parallel: {
-    border: 'border-purple-500',
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    icon: <Shuffle className="h-4 w-4 text-purple-500" />,
-  },
-  DataTransformation: {
-    border: 'border-teal-500',
-    bg: 'bg-teal-50 dark:bg-teal-900/20',
-    icon: <Code className="h-4 w-4 text-teal-500" />,
+    label: 'Delay',
+    type: 'Delay',
+    icon: <svg className="h-5 w-5 text-orange-500" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" /></svg>,
+    config: {
+      durationMilliseconds: 1000,
+      userDescription: ''
+    } as DelayTaskConfig,
+    description: 'Pause the workflow for a specified duration',
+    category: 'Control',
   },
   start: {
-    border: 'border-green-500',
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    icon: <Play className="h-4 w-4 text-green-600" />,
+    label: 'Start',
+    type: 'start',
+    icon: <svg className="h-5 w-5 text-green-500" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor" /></svg>,
+    config: {
+      userDescription: ''
+    } as StartNodeConfig,
+    description: 'Entry point of the workflow',
+    category: 'System',
   },
-}
-
-// Helper: Get node description
-const getNodeDescription = (type: string, config: any) => {
-  switch (type) {
-    case 'Delay':
-      return `Pause workflow for ${config?.DurationSeconds || 60} seconds.`
-    case 'HttpCallout':
-      return `Call ${config?.Url || 'an API endpoint'} (${config?.Method || 'GET'})`
-    case 'ScriptExecution':
-      return `Run a ${config?.Language || 'script'} script.`
-    case 'StoragePush':
-      return `Push data to ${config?.DestinationType || 'SFTP'}`
-    case 'Conditional':
-      return `If ${config?.Expression || 'condition'}`
-    case 'Split':
-      return `Split into ${config?.Branches || 2} branches.`
-    case 'Iteration':
-      return `For each in ${config?.Collection || 'items'}`
-    case 'Merge':
-      return `Merge branches.`
-    case 'Batch':
-      return `Run tasks in batch.`
-    case 'Parallel':
-      return `Run tasks in parallel.`
-    case 'DataTransformation':
-      return `Transform data using ${config?.Language || 'script'}`
-    default:
-      return ''
-  }
-}
-
-// Modal state
-// Remove these from the top-level scope:
-// const [editNode, setEditNode] = useState<Node<NodeData> | null>(null)
-// const [editConfig, setEditConfig] = useState<any>(null)
-// const [editLabel, setEditLabel] = useState<string>('')
-
-const TaskNode = ({ data, id }: { data: NodeData; id: string }) => {
-  const style = NODE_TYPE_STYLES[data.type || 'HttpCallout'] || NODE_TYPE_STYLES['HttpCallout']
-  return (
-    <Card className={`w-64 border-2 ${style.border} ${style.bg} group relative`}>
-      {/* Action buttons */}
-      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-        <button
-          className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-          onClick={e => { e.stopPropagation(); setEditNode({ id, data }); setEditConfig(data.config); setEditLabel(data.label); }}
-          title="Edit"
-        >
-          <Settings className="h-4 w-4" />
-        </button>
-        <button
-          className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900"
-          onClick={e => { e.stopPropagation(); if (window.confirm('Delete this node?')) deleteNode(id); }}
-          title="Delete"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center space-x-2 text-sm">
-          {style.icon}
-          <span>{data.label}</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-          {getNodeDescription(data.type, data.config)}
-        </p>
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="target"
-          style={{ background: '#3b82f6' }}
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="onSuccess"
-          style={{ background: '#10b981', top: '30%' }}
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="onFailure"
-          style={{ background: '#ef4444', top: '70%' }}
-        />
-      </CardContent>
-    </Card>
-  )
-}
-
-// Move nodeTypes outside the component
-const nodeTypes: NodeTypes = {
-  startingNode: StartingNode,
-  taskNode: TaskNode,
 };
 
+const TASK_CATEGORIES = [
+  { label: 'Integration', key: 'integration', tasks: ['HttpCallout'] },
+  { label: 'Control', key: 'control', tasks: ['Delay'] },
+];
+
+// Type guard for authentication object
+function isAuthType(obj: unknown): obj is { type: string } {
+  return typeof obj === 'object' && obj !== null && 'type' in obj && typeof (obj as { type: unknown }).type === 'string';
+}
+
 export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
-  const [selectedNode, setSelectedNode] = useState<Node<NodeData> | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [lastSavedPositions, setLastSavedPositions] = useState<Record<string, { x: number; y: number }>>({})
+  const [nodes, setNodes, onNodesChange] = useNodesState<NodeData>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editNode, setEditNode] = useState<Node<NodeData> | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
+  const lastSavedPositions = useRef<Record<string, { x: number; y: number }>>({});
   const studioRef = useRef<HTMLDivElement>(null);
-  // Detect dark mode
-  const isDark = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+  const [paletteOpen, setPaletteOpen] = useState(true);
+  const pendingNodeUpdates = useRef<{ id: string, position: { x: number, y: number } }[]>([]);
 
-  // ✅ Move these hooks here:
-  const [editNode, setEditNode] = useState<Node<NodeData> | null>(null)
-  const [editConfig, setEditConfig] = useState<any>(null)
-  const [editLabel, setEditLabel] = useState<string>('')
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
-
-  useEffect(() => {
-    function updateStudioBg() {
-      const isDark = document.documentElement.classList.contains('dark');
-      if (studioRef.current) {
-        studioRef.current.style.backgroundColor = isDark ? '#18181b' : '#fff';
-      }
-      if (document.fullscreenElement) {
-        document.body.style.backgroundColor = isDark ? '#18181b' : '#fff';
-      } else {
-        document.body.style.backgroundColor = '';
-      }
-    }
-
-    // Listen for theme changes
-    const observer = new MutationObserver(updateStudioBg);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-
-    // Listen for fullscreen changes
-    document.addEventListener('fullscreenchange', updateStudioBg);
-
-    // Initial set
-    updateStudioBg();
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('fullscreenchange', updateStudioBg);
-    };
-  }, []);
+  // Drag events
+  const dragTaskType = useRef<string | null>(null);
+  const onDragStart = (type: string) => (e: React.DragEvent) => {
+    dragTaskType.current = type;
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const onDragEnd = () => { dragTaskType.current = null; };
 
   // Load workflow data from API
   useEffect(() => {
     const loadWorkflowData = async () => {
       try {
-        setLoading(true)
-        setError(null)
-
-        // Load workflow nodes from API
-        const workflowNodes = await apiService.getWorkflowNodes(workflowId)
-        
+        setLoading(true);
+        setError(null);
+        const workflowNodes = await apiService.getWorkflowNodes(workflowId);
         if (workflowNodes && workflowNodes.length > 0) {
-          // Convert API nodes to React Flow nodes
           const reactFlowNodes: Node<NodeData>[] = workflowNodes.map(node => ({
             id: node.id,
             type: node.isStartingNode || node.type === 'start' ? 'startingNode' : 'taskNode',
@@ -336,79 +127,62 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
             data: {
               label: node.name,
               type: node.type || 'http',
-              description: `Task ${node.name}`,
+              description: node.configuration ? JSON.parse(node.configuration).description || `Task ${node.name}` : `Task ${node.name}`,
               isActive: node.isActive,
-              config: node.configuration ? JSON.parse(node.configuration) : {}, // Add config
+              config: node.configuration ? JSON.parse(node.configuration) : {},
             },
-          }))
-
-          // Convert connections to React Flow edges
-          const reactFlowEdges: Edge[] = []
+          }));
+          const reactFlowEdges: Edge[] = [];
           workflowNodes.forEach(node => {
             node.connections.forEach(targetNodeId => {
-              reactFlowEdges.push({
-                id: `${node.id}-${targetNodeId}`,
-                source: node.id,
-                target: targetNodeId,
-                sourceHandle: 'onExecute', // Default handle
-                targetHandle: 'target',
-                type: 'smoothstep',
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  width: 20,
-                  height: 20,
-                  color: '#10b981',
-                },
-                style: { 
-                  stroke: '#10b981', 
-                  strokeWidth: 2 
-                },
-                label: 'On Execute',
-                labelStyle: { 
-                  fill: '#10b981', 
-                  fontWeight: 600 
-                },
-                labelBgStyle: { fill: '#ffffff', fillOpacity: 0.8 },
-              })
-            })
-          })
-
-          setNodes(reactFlowNodes)
-          setEdges(reactFlowEdges)
+              if (typeof targetNodeId === 'string') {
+                reactFlowEdges.push({
+                  id: `${node.id}-${targetNodeId}`,
+                  source: node.id,
+                  target: targetNodeId,
+                  sourceHandle: 'onExecute',
+                  targetHandle: 'target',
+                  type: 'smoothstep',
+                  markerEnd: {
+                    type: MarkerType.ArrowClosed,
+                    width: 20,
+                    height: 20,
+                    color: '#10b981',
+                  },
+                  style: { stroke: '#10b981', strokeWidth: 2 },
+                  label: 'On Execute',
+                  labelStyle: { fill: '#10b981', fontWeight: 600 },
+                  labelBgStyle: { fill: '#ffffff', fillOpacity: 0.8 },
+                });
+              }
+            });
+          });
+          setNodes(reactFlowNodes);
+          setEdges(reactFlowEdges);
         } else {
-          // If no nodes exist, create a proper starting node in the database
-          await createStartingNode()
+          await createStartingNode();
         }
-      } catch (err) {
-        console.error('Failed to load workflow data:', err)
-        setError('Failed to load workflow data. Please try again.')
-        
-        // Try to create a starting node as fallback
+      } catch {
+        setError('Failed to load workflow data. Please try again.');
         try {
-          await createStartingNode()
-        } catch (createError) {
-          console.error('Failed to create starting node as fallback:', createError)
-          // If all else fails, show a minimal starting node
-          const fallbackNodes: Node<NodeData>[] = [
+          await createStartingNode();
+        } catch {
+          setNodes([
             {
               id: 'start',
               type: 'startingNode',
               position: { x: 50, y: 200 },
               data: { label: 'Start Workflow' },
             },
-          ]
-          setNodes(fallbackNodes)
-          setEdges([])
+          ]);
+          setEdges([]);
         }
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
-
-    if (workflowId) {
-      loadWorkflowData()
-    }
-  }, [workflowId, setNodes, setEdges])
+    };
+    if (workflowId) loadWorkflowData();
+  }, [workflowId, setNodes]);
 
   // Create starting node if needed
   const createStartingNode = useCallback(async () => {
@@ -420,12 +194,9 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
         positionX: 0,
         positionY: 0,
         isActive: true,
-        connections: []
-      })
-      
-      // Reload the workflow data to get the new starting node
-      const workflowNodes = await apiService.getWorkflowNodes(workflowId)
-      
+        connections: [],
+      });
+      const workflowNodes = await apiService.getWorkflowNodes(workflowId);
       if (workflowNodes && workflowNodes.length > 0) {
         const reactFlowNodes: Node<NodeData>[] = workflowNodes.map(node => ({
           id: node.id,
@@ -434,171 +205,173 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
           data: {
             label: node.name,
             type: node.type || 'http',
-            description: `Task ${node.name}`,
+            description: node.configuration ? JSON.parse(node.configuration).description || `Task ${node.name}` : `Task ${node.name}`,
             isActive: node.isActive,
-            config: node.configuration ? JSON.parse(node.configuration) : {}, // Add config
+            config: node.configuration ? JSON.parse(node.configuration) : {},
           },
-        }))
-        
-        setNodes(reactFlowNodes)
-        setEdges([])
+        }));
+        setNodes(reactFlowNodes);
+        setEdges([]);
       }
-    } catch (error) {
-      console.error('Failed to create starting node:', error)
-      setError('Failed to create starting node. Please try again.')
+    } catch {
+      setError('Failed to create starting node. Please try again.');
     }
-  }, [workflowId, setNodes, setEdges])
+  }, [workflowId, setNodes]);
 
   // Debounced save function
   const saveNodePositions = useCallback(
     debounce(async (nodePositions: Record<string, { x: number; y: number }>) => {
       try {
-        setSaving(true)
-        console.log('Saving node positions:', nodePositions)
-        
-        // Filter out nodes with invalid GUIDs (like 'start' node)
+        setSaving(true);
         const validNodePositions = Object.entries(nodePositions).filter(([nodeId]) => {
-          // Check if nodeId is a valid GUID
-          const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          return guidRegex.test(nodeId)
-        })
-        
-        if (validNodePositions.length === 0) {
-          return
-        }
-        
-        // Check if positions have actually changed
+          const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return guidRegex.test(nodeId);
+        });
+        if (validNodePositions.length === 0) return;
         const hasChanges = validNodePositions.some(([nodeId, position]) => {
-          const lastSaved = lastSavedPositions[nodeId]
-          return !lastSaved || 
-                 lastSaved.x !== position.x || 
-                 lastSaved.y !== position.y
-        })
-
+          const lastSaved = lastSavedPositions.current[nodeId];
+          return !lastSaved || lastSaved.x !== position.x || lastSaved.y !== position.y;
+        });
         if (hasChanges) {
-          // Save each node position to the backend
           const savePromises = validNodePositions.map(([nodeId, position]) =>
             apiService.updateWorkflowNode(workflowId, nodeId, { position })
-          )
-          
-          await Promise.all(savePromises)
-          
-          // Update last saved positions only for valid nodes
-          const newLastSaved = { ...lastSavedPositions }
+          );
+          await Promise.all(savePromises);
+          const newLastSaved = { ...lastSavedPositions.current };
           validNodePositions.forEach(([nodeId, position]) => {
-            newLastSaved[nodeId] = position
-          })
-          setLastSavedPositions(newLastSaved)
-          
+            newLastSaved[nodeId] = position;
+          });
+          lastSavedPositions.current = newLastSaved;
         }
-      } catch (error) {
-        console.error('Failed to save node positions:', error)
-        setError('Failed to save node positions. Please try again.')
+      } catch {
+        setError('Failed to save node positions. Please try again.');
       } finally {
-        setSaving(false)
+        setSaving(false);
       }
     }, 1000),
-    [workflowId, lastSavedPositions]
-  )
+    [workflowId]
+  );
 
   // Debounced save effect
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (nodes.length > 0) {
-        // Filter out nodes with invalid GUIDs
         const validNodes = nodes.filter(node => {
-          const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          return guidRegex.test(node.id)
-        })
-        
-        if (validNodes.length === 0) {
-          return
-        }
-        
+          const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          return guidRegex.test(node.id);
+        });
+        if (validNodes.length === 0) return;
         const currentPositions = validNodes.reduce((acc, node) => {
-          acc[node.id] = { x: node.position.x, y: node.position.y }
-          return acc
-        }, {} as Record<string, { x: number; y: number }>)
-
-        // Check if any positions have changed
+          acc[node.id] = { x: node.position.x, y: node.position.y };
+          return acc;
+        }, {} as Record<string, { x: number; y: number }>);
         const hasChanges = validNodes.some(node => {
-          const lastSaved = lastSavedPositions[node.id]
-          return !lastSaved || 
-                 lastSaved.x !== node.position.x || 
-                 lastSaved.y !== node.position.y
-        })
-
+          const lastSaved = lastSavedPositions.current[node.id];
+          return !lastSaved || lastSaved.x !== node.position.x || lastSaved.y !== node.position.y;
+        });
         if (hasChanges) {
-          saveNodePositions(currentPositions)
+          saveNodePositions(currentPositions);
         }
       }
-    }, 1000) // Save after 1 second of no changes
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [nodes, saveNodePositions]);
 
-    return () => clearTimeout(timeoutId)
-  }, [nodes, lastSavedPositions, saveNodePositions])
-
-  // Custom node change handler to track position changes
+  // Custom node change handler
   const onNodesChangeCustom = useCallback((changes: NodeChange[]) => {
-    onNodesChange(changes)
-    
-    // Check if any position changes occurred
-    const positionChanges = changes.filter(change => 
-      change.type === 'position' && change.position
-    )
-    
-    if (positionChanges.length > 0) {
-      // Positions changed, the useEffect will handle saving
+    onNodesChange(changes);
+    // Only process NodePositionChange with defined position
+    const movedNodes = changes
+      .filter((change): change is NodePositionChange => change.type === 'position' && 'id' in change && 'position' in change && !!change.position)
+      .filter(change => change.position !== undefined)
+      .map(change => ({ id: change.id, position: change.position as { x: number; y: number } }));
+    if (movedNodes.length > 0) {
+      pendingNodeUpdates.current.push(...movedNodes);
+      debouncedSyncNodePositions();
     }
-  }, [onNodesChange])
+  }, [onNodesChange]);
+
+  const debouncedSyncNodePositions = useCallback(debounce(() => {
+    // Remove duplicates by id (keep last move)
+    const updates = uniqBy([...pendingNodeUpdates.current], 'id');
+    pendingNodeUpdates.current = [];
+    if (updates.length === 1) {
+      apiService.updateWorkflowNode(workflowId, updates[0].id, { position: updates[0].position });
+    } else if (updates.length > 1) {
+      // Use the new batch API endpoint
+      const batchPayload = updates.map(update => ({
+        nodeId: update.id,
+        positionX: update.position.x,
+        positionY: update.position.y
+      }));
+      fetch(`/api/workflows/${workflowId}/nodes/positions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchPayload)
+      });
+    }
+  }, 500), [workflowId]);
 
   const onConnect = useCallback(
     (params: Connection) => {
-      const isStartToTask = params.sourceHandle === 'onExecute' && params.targetHandle === 'target';
-      if (isStartToTask) {
-        // Only allow one outgoing edge from the starting node
+      if (!params.source || !params.target) return;
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const isConditional = sourceNode?.data?.type === 'Conditional';
+      const isStartNode = sourceNode?.type === 'startingNode' || sourceNode?.data?.type === 'start';
+      if (!isConditional) {
         const alreadyExists = edges.some(
-          (e) => e.source === params.source && e.sourceHandle === 'onExecute'
+          (e) => e.source === params.source && e.sourceHandle === params.sourceHandle
         );
         if (alreadyExists) {
-          window.alert('The Start Workflow node can only have one outgoing connection.');
+          window.alert('Only one outgoing connection per handle is allowed.');
           return;
         }
       }
-      if (params.source && params.target && params.sourceHandle && params.targetHandle) {
-        const newEdge: Edge = {
-          id: `${params.source}-${params.target}-${Date.now()}`,
-          source: params.source,
-          target: params.target,
-          sourceHandle: params.sourceHandle,
-          targetHandle: params.targetHandle,
-          type: 'smoothstep',
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: params.sourceHandle === 'onFailure' ? '#ef4444' : '#10b981',
-          },
-          style: { 
-            stroke: params.sourceHandle === 'onFailure' ? '#ef4444' : '#10b981', 
-            strokeWidth: 2 
-          },
-          label: isStartToTask ? 'On Trigger' : undefined,
-          labelStyle: isStartToTask
-            ? { fill: '#10b981', fontWeight: 600 }
-            : undefined,
-          labelBgStyle: isStartToTask
-            ? { fill: '#ffffff', fillOpacity: 0.8 }
-            : undefined,
-        }
-        setEdges((eds) => addEdge(newEdge, eds))
-      }
+      let label = '';
+      if (isStartNode) label = 'On Execute';
+      else if (params.sourceHandle === 'onSuccess') label = 'On Success';
+      else if (params.sourceHandle === 'onFailure') label = 'On Failure';
+      else if (isConditional) label = params.sourceHandle || 'Case';
+      const labelStyle = {
+        fill: isStartNode
+          ? '#10b981'
+          : params.sourceHandle === 'onFailure'
+          ? '#ef4444'
+          : '#10b981',
+        fontWeight: 600,
+        fontSize: 14,
+        letterSpacing: 0.5,
+      };
+      const newEdge: Edge = {
+        id: `${params.source}-${params.target}-${Date.now()}`,
+        source: params.source,
+        target: params.target,
+        sourceHandle: params.sourceHandle,
+        targetHandle: params.targetHandle,
+        type: 'smoothstep',
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 20,
+          height: 20,
+          color: params.sourceHandle === 'onFailure' ? '#ef4444' : '#10b981',
+        },
+        label,
+        labelStyle,
+        labelBgStyle: {
+          fill: '#fff',
+          fillOpacity: 1,
+          stroke: '#222',
+          strokeWidth: 0.5,
+        },
+        style: {
+          stroke: params.sourceHandle === 'onFailure' ? '#ef4444' : '#10b981',
+          strokeWidth: 2,
+        },
+      };
+      setEdges((eds) => addEdge(newEdge, eds));
     },
-    [setEdges, edges]
-  )
-
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node<NodeData>) => {
-    setSelectedNode(node)
-  }, [])
+    [setEdges, edges, nodes]
+  );
 
   const addTaskNode = useCallback(async () => {
     try {
@@ -609,10 +382,8 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
         positionX: 650,
         positionY: 200 + Math.random() * 200,
         isActive: true,
-        connections: []
-      })
-      
-      // Add the new node to the local state
+        connections: [],
+      });
       const reactFlowNode: Node<NodeData> = {
         id: newNode.id,
         type: 'taskNode',
@@ -620,184 +391,32 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
         data: {
           label: newNode.name,
           type: newNode.type,
-          description: `Task ${newNode.name}`,
+          description: newNode.configuration ? JSON.parse(newNode.configuration).description || `Task ${newNode.name}` : `Task ${newNode.name}`,
           isActive: newNode.isActive,
-          config: newNode.configuration ? JSON.parse(newNode.configuration) : {}, // Add config
+          config: newNode.configuration ? JSON.parse(newNode.configuration) : {},
         },
-      }
-      
-      setNodes((nds) => [...nds, reactFlowNode])
-    } catch (error) {
-      console.error('Failed to create new task:', error)
-      setError('Failed to create new task. Please try again.')
+      };
+      setNodes((nds) => [...nds, reactFlowNode]);
+    } catch {
+      setError('Failed to create new task. Please try again.');
     }
-  }, [workflowId, setNodes])
+  }, [workflowId, setNodes]);
 
-  const deleteNode = useCallback(async (nodeId: string) => {
-    try {
-      await apiService.deleteWorkflowNode(workflowId, nodeId)
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId))
-      setEdges((eds) => eds.filter((edge) => 
-        edge.source !== nodeId && edge.target !== nodeId
-      ))
-      setSelectedNode(null)
-    } catch (error) {
-      console.error('Failed to delete node:', error)
-      setError('Failed to delete node. Please try again.')
+  const handleFullscreen = () => {
+    if (!document.fullscreenElement && studioRef.current) {
+      studioRef.current.requestFullscreen();
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen();
     }
-  }, [workflowId, setNodes, setEdges])
+  };
 
-  const saveNodeConfig = useCallback(async (nodeId: string, label: string, config: any) => {
-    try {
-      await apiService.updateWorkflowNode(workflowId, nodeId, { name: label, configuration: JSON.stringify(config) })
-      setNodes((nds) =>
-        nds.map((node) =>
-          node.id === nodeId
-            ? { ...node, data: { ...node.data, label: label, config: config } }
-            : node
-        )
-      )
-      setEditNode(null) // Close modal
-    } catch (error) {
-      console.error('Failed to save node config:', error)
-      setError('Failed to save node config. Please try again.')
-    }
-  }, [workflowId, setNodes])
-
-  // Drag-and-drop logic
-  const dragTaskType = useRef<string | null>(null)
-
-  // Helper: Default configs for each type
-  const TASK_TYPE_CONFIGS: Record<string, { label: string; type: string; icon: JSX.Element; config: any; description: string }> = {
-    HttpCallout: {
-      label: 'HTTP Callout',
-      type: 'HttpCallout',
-      icon: <Globe className="h-5 w-5 text-blue-500" />,
-      config: {
-        Method: 'GET',
-        Url: 'https://api.example.com/endpoint',
-        TimeoutSeconds: 30,
-        ContentType: 'application/json',
-        Headers: {},
-        Authentication: { Type: 'none' }
-      },
-      description: 'Call external APIs via HTTP(S)'
-    },
-    ScriptExecution: {
-      label: 'Data Process (Bash Script)',
-      type: 'ScriptExecution',
-      icon: <Code className="h-5 w-5 text-purple-500" />,
-      config: {
-        Language: 'bash',
-        Script: "#!/bin/bash\necho 'Hello World'",
-        TimeoutSeconds: 30,
-        OutputFormat: 'json'
-      },
-      description: 'Run a Bash script for data processing'
-    },
-    StoragePush: {
-      label: 'Data Load (Push to SFTP)',
-      type: 'StoragePush',
-      icon: <UploadCloud className="h-5 w-5 text-green-500" />,
-      config: {
-        DestinationType: 'SFTP',
-        Host: 'sftp.example.com',
-        Port: 22,
-        Username: 'user',
-        Password: '',
-        RemotePath: '/upload/path/'
-      },
-      description: 'Push data to SFTP server'
-    },
-    Conditional: {
-      label: 'Conditional',
-      type: 'Conditional',
-      icon: <HelpCircle className="h-5 w-5 text-yellow-500" />,
-      config: {
-        Expression: 'x > 0',
-        TrueBranch: [],
-        FalseBranch: []
-      },
-      description: 'Branch workflow based on a condition'
-    },
-    Split: {
-      label: 'Split',
-      type: 'Split',
-      icon: <GitBranch className="h-5 w-5 text-pink-500" />,
-      config: {
-        Branches: 2
-      },
-      description: 'Split execution into multiple branches'
-    },
-    Iteration: {
-      label: 'Iteration',
-      type: 'Iteration',
-      icon: <Repeat className="h-5 w-5 text-blue-400" />,
-      config: {
-        Collection: 'items',
-        Iterator: 'item'
-      },
-      description: 'Repeat a set of tasks for each item in a collection'
-    },
-    Merge: {
-      label: 'Merge',
-      type: 'Merge',
-      icon: <GitMerge className="h-5 w-5 text-gray-500" />,
-      config: {},
-      description: 'Merge multiple branches back together'
-    },
-    Delay: {
-      label: 'Delay',
-      type: 'Delay',
-      icon: <Clock className="h-5 w-5 text-orange-500" />,
-      config: {
-        DurationSeconds: 10
-      },
-      description: 'Pause the workflow for a specified duration'
-    },
-    Batch: {
-      label: 'Batch',
-      type: 'Batch',
-      icon: <Shuffle className="h-5 w-5 text-red-500" />,
-      config: {
-        Tasks: []
-      },
-      description: 'Run multiple tasks in parallel or sequentially'
-    },
-    Parallel: {
-      label: 'Parallel',
-      type: 'Parallel',
-      icon: <Shuffle className="h-5 w-5 text-purple-500" />,
-      config: {
-        Tasks: []
-      },
-      description: 'Run multiple tasks in parallel'
-    },
-    DataTransformation: {
-      label: 'Data Transformation',
-      type: 'DataTransformation',
-      icon: <Code className="h-5 w-5 text-teal-500" />,
-      config: {
-        Script: '// This is a placeholder for a data transformation script',
-        Language: 'javascript'
-      },
-      description: 'Apply complex data transformations using a scripting language'
-    }
-  }
-
-  // Define categories for the palette
-  const TASK_CATEGORIES: { label: string; key: string; tasks: string[] }[] = [
-    { label: 'Integration', key: 'integration', tasks: ['HttpCallout', 'StoragePush', 'Notification'] },
-    { label: 'Data', key: 'data', tasks: ['ScriptExecution', 'DataTransformation'] },
-    { label: 'Control', key: 'control', tasks: ['Conditional', 'Split', 'Iteration', 'Merge', 'Delay', 'Batch', 'Parallel'] },
-  ];
-
-  // Drag events
-  const onDragStart = (type: string) => (e: React.DragEvent) => {
-    dragTaskType.current = type
-    e.dataTransfer.effectAllowed = 'move'
-  }
-  const onDragEnd = () => { dragTaskType.current = null }
+  // Edit modal logic
+  const openEditModal = (node: Node<NodeData>) => {
+    setEditNode(node);
+    const config = (node.data.config ?? {}) as Record<string, unknown>;
+    setEditDescription(typeof config.userDescription === 'string' ? config.userDescription : '');
+    setEditConfig(config);
+  };
 
   // React Flow drop handler
   const onDrop = useCallback(
@@ -806,10 +425,10 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
       const bounds = event.currentTarget.getBoundingClientRect();
       const x = event.clientX - bounds.left;
       const y = event.clientY - bounds.top;
-      const flowPosition = reactFlowInstance?.project({ x, y }) ?? { x, y }; // Use React Flow's project
+      const flowPosition = { x, y };
       const type = dragTaskType.current;
       if (!type) return;
-      const def = TASK_TYPE_CONFIGS[type];
+      const def = TASK_TYPE_CONFIGS[type as keyof typeof TASK_TYPE_CONFIGS];
       try {
         const newNode = await apiService.createWorkflowNode(workflowId, {
           name: def.label,
@@ -827,38 +446,60 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
           data: {
             label: newNode.name,
             type: newNode.type,
-            description: def.description,
+            description: newNode.configuration ? JSON.parse(newNode.configuration).description || `Task ${newNode.name}` : `Task ${newNode.name}`,
             isActive: newNode.isActive,
             config: newNode.configuration ? JSON.parse(newNode.configuration) : {},
           },
         };
         setNodes((nds) => [...nds, reactFlowNode]);
-      } catch (error) {
+      } catch {
         setError('Failed to create new task. Please try again.');
       }
     },
-    [workflowId, setNodes, reactFlowInstance]
+    [workflowId, setNodes]
   );
 
-  const handleFullscreen = () => {
-    if (!document.fullscreenElement && studioRef.current) {
-      studioRef.current.requestFullscreen();
-    } else if (document.fullscreenElement) {
-      document.exitFullscreen();
+  // Fullscreen background fix
+  useEffect(() => {
+    function updateStudioBg() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (studioRef.current) {
+        studioRef.current.style.backgroundColor = isDark ? '#18181b' : '#fff';
+      }
+      if (document.fullscreenElement) {
+        document.body.style.backgroundColor = isDark ? '#18181b' : '#fff';
+      } else {
+        document.body.style.backgroundColor = '';
+      }
     }
-  };
+    const observer = new MutationObserver(updateStudioBg);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    document.addEventListener('fullscreenchange', updateStudioBg);
+    updateStudioBg();
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('fullscreenchange', updateStudioBg);
+    };
+  }, []);
+
+  // Listen for 'editNode' event to open modal from nodeTypes
+  React.useEffect(() => {
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ id: string; data: NodeData }>;
+      const node = nodes.find(n => n.id === customEvent.detail.id);
+      if (node) {
+        setEditNode(node);
+        const config = (node.data.config ?? {}) as Record<string, unknown>;
+        setEditDescription(typeof config.userDescription === 'string' ? config.userDescription : '');
+        setEditConfig(config);
+      }
+    };
+    window.addEventListener('editNode', handler as EventListener);
+    return () => window.removeEventListener('editNode', handler as EventListener);
+  }, [nodes]);
 
   return (
-    <div
-      ref={studioRef}
-      className="h-screen flex flex-col relative"
-      style={{
-        backgroundColor: isDark ? '#18181b' : '#fff',
-        transition: 'background 0.2s',
-      }}
-    >
-      {/* Fullscreen button, always in top-right */}
-      {/* Removed absolute fullscreen button */}
+    <>
       {/* Toolbar */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 z-20">
         <div className="flex items-center space-x-2">
@@ -866,11 +507,11 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
             <Plus className="h-4 w-4 mr-2" />
             Add Task
           </Button>
-          {selectedNode && selectedNode.id !== 'start' && (
+          {editNode && editNode.id !== 'start' && (
             <Button
               size="sm"
               variant="outline"
-              onClick={() => deleteNode(selectedNode.id)}
+              onClick={() => setNodes((nds) => nds.filter((n) => n.id !== editNode.id))}
               disabled={loading}
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -915,9 +556,9 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
 
       {/* Main Studio Area */}
       <div className="flex flex-1 min-h-0 relative h-full">
-        {/* Canvas */}
         <div
           className="flex-1 relative h-full"
+          ref={studioRef}
           onDrop={onDrop}
           onDragOver={e => e.preventDefault()}
         >
@@ -933,42 +574,11 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
               onNodesChange={onNodesChangeCustom}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
-              onNodeClick={onNodeClick}
+              onNodeClick={(_, node) => openEditModal(node)}
               nodeTypes={nodeTypes}
               proOptions={{ hideAttribution: true }}
-              defaultEdgeOptions={{
-                type: 'smoothstep',
-                animated: true,
-                style: {
-                  stroke: '#666',
-                  strokeWidth: 3,
-                },
-              }}
               fitView
               attributionPosition="bottom-left"
-              onInit={setReactFlowInstance}
-              onEdgeUpdate={(oldEdge, newConnection) => {
-                // Only allow one outgoing edge from the Start node
-                if (
-                  oldEdge.sourceHandle === 'onExecute' &&
-                  edges.filter(e => e.source === oldEdge.source && e.sourceHandle === 'onExecute').length > 1
-                ) {
-                  window.alert('The Start Workflow node can only have one outgoing connection.');
-                  return;
-                }
-                setEdges((eds) =>
-                  eds.map((e) =>
-                    e.id === oldEdge.id
-                      ? {
-                          ...e,
-                          target: newConnection.target,
-                          targetHandle: newConnection.targetHandle,
-                          label: oldEdge.sourceHandle === 'onExecute' ? 'On Trigger' : e.label,
-                        }
-                      : e
-                  )
-                );
-              }}
             >
               <Background />
               <Controls />
@@ -976,15 +586,21 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
             </ReactFlow>
           )}
         </div>
-        {/* Task Palette Sidebar */}
-        <div className="w-64 p-4 h-full flex flex-col border-l border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white/90 to-gray-50/80 dark:from-gray-900/90 dark:to-gray-800/80 gap-4 z-10 overflow-y-auto">
-          <h4 className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Add Task</h4>
-          {TASK_CATEGORIES.map(category => (
+        {/* Collapsible Palette Sidebar */}
+        <div className={`transition-all duration-300 ${paletteOpen ? 'w-64' : 'w-10'} p-2 h-full flex flex-col border-l border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white/90 to-gray-50/80 dark:from-gray-900/90 dark:to-gray-800/80 gap-4 z-10 overflow-y-auto`}>
+          <button
+            className="mb-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+            onClick={() => setPaletteOpen(!paletteOpen)}
+            title={paletteOpen ? 'Collapse' : 'Expand'}
+          >
+            {paletteOpen ? '>' : '<'}
+          </button>
+          {paletteOpen && TASK_CATEGORIES.map(category => (
             <div key={category.key} className="mb-4">
               <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2 pl-1">{category.label}</div>
               <div className="flex flex-col gap-2">
                 {category.tasks.map(taskKey => {
-                  const def = TASK_TYPE_CONFIGS[taskKey];
+                  const def = TASK_TYPE_CONFIGS[taskKey as keyof typeof TASK_TYPE_CONFIGS];
                   if (!def) return null;
                   return (
                     <div
@@ -1001,7 +617,7 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
                         <div className="text-xs text-gray-500 dark:text-gray-400">{def.description}</div>
                       </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -1009,93 +625,186 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
         </div>
       </div>
 
-      {/* Node Properties Panel */}
-      {selectedNode && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-          <h3 className="font-semibold mb-2">Node Properties</h3>
-          <div className="space-y-2">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <input
-                type="text"
-                value={selectedNode.data.label}
-                onChange={(e) => {
-                  setNodes((nds) =>
-                    nds.map((node) =>
-                      node.id === selectedNode.id
-                        ? { ...node, data: { ...node.data, label: e.target.value } }
-                        : node
-                    )
-                  )
-                }}
-                className="w-full p-2 border rounded-md"
-              />
-            </div>
-            {selectedNode.type === 'taskNode' && (
-              <div>
-                <label className="text-sm font-medium">Type</label>
-                <select
-                  value={selectedNode.data.type}
-                  onChange={(e) => {
-                    setNodes((nds) =>
-                      nds.map((node) =>
-                        node.id === selectedNode.id
-                          ? { ...node, data: { ...node.data, type: e.target.value } }
-                          : node
-                      )
-                    )
-                  }}
-                  className="w-full p-2 border rounded-md"
-                >
-                  <option value="HttpCallout">HTTP Callout</option>
-                  <option value="ScriptExecution">Data Process (Bash Script)</option>
-                  <option value="StoragePush">Data Load (Push to SFTP)</option>
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Edit Node Modal */}
-      <Dialog open={!!editNode} onOpenChange={open => { if (!open) setEditNode(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Node</DialogTitle>
-            <DialogDescription>Update the configuration for this node.</DialogDescription>
-          </DialogHeader>
-          {/* Dynamic config form based on node type */}
-          {editNode && (
-            <form onSubmit={e => { e.preventDefault(); saveNodeConfig(editNode.id, editLabel, editConfig); setEditNode(null); }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
-                <input
-                  className="w-full p-2 border rounded"
-                  value={editLabel}
-                  onChange={e => setEditLabel(e.target.value)}
-                />
+      <Dialog open={!!editNode} onOpenChange={open => { if (!open) setEditNode(null); }}>
+        <DialogContent className="p-0 bg-transparent border-none shadow-none">
+          <Card
+            className="w-full max-w-lg mx-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up"
+          >
+            <CardHeader className="pb-4 flex flex-col items-start gap-2 relative border-0">
+              <div className="flex items-center gap-3 w-full">
+                <div className="flex items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-300 p-2">
+                  <Info className="h-6 w-6 text-blue-500" />
+                </div>
+                <CardTitle className="text-2xl font-extrabold bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent">
+                  {editNode?.data?.type === 'start' || editNode?.id === 'start' ? 'Edit Starting Node' : editNode ? `Edit ${editNode?.data?.type || 'Node'}` : 'Edit Node'}
+                </CardTitle>
               </div>
-              {/* Example for Delay */}
-              {editNode.data.type === 'Delay' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Duration (seconds)</label>
-                  <input
-                    type="number"
-                    className="w-full p-2 border rounded"
-                    value={editConfig?.DurationSeconds || 60}
-                    min={1}
-                    onChange={e => setEditConfig({ ...editConfig, DurationSeconds: parseInt(e.target.value) })}
+              <CardDescription className="dark:text-gray-300 mt-1 ml-1">
+                Update the configuration for this node.
+              </CardDescription>
+              <div className="w-full h-px bg-gradient-to-r from-blue-400/60 via-blue-300/30 to-transparent mt-1" />
+            </CardHeader>
+            <CardContent className="py-4">
+              <form
+                onSubmit={async e => {
+                  e.preventDefault();
+                  const updatedConfig = { ...editConfig, userDescription: editDescription };
+                  setSaving(true);
+                  try {
+                    await apiService.updateWorkflowNode(workflowId, editNode?.id ?? '', {
+                      configuration: JSON.stringify(updatedConfig),
+                      name: editNode?.data?.label ?? '',
+                      type: editNode?.data?.type ?? '',
+                      isActive: editNode?.data?.isActive ?? true,
+                      position: editNode?.position ?? { x: 0, y: 0 },
+                    });
+                    setNodes(nds =>
+                      nds.map(n =>
+                        n.id === editNode?.id
+                          ? {
+                              ...n,
+                              data: {
+                                ...n.data,
+                                description: editDescription,
+                                config: updatedConfig,
+                              },
+                            }
+                          : n
+                      )
+                    );
+                    setEditNode(null);
+                  } catch {
+                    setError('Failed to update node.');
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label className="block text-sm font-medium">User Description</Label>
+                    <span
+                      tabIndex={-1}
+                      className="relative inline-flex items-center justify-center rounded-full bg-blue-100 text-blue-500 w-5 h-5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 group"
+                    >
+                      <Info className="h-4 w-4" />
+                      <span className="absolute left-1/2 top-full z-20 mt-2 w-max min-w-[220px] -translate-x-1/2 rounded bg-white px-3 py-2 text-xs text-blue-700 shadow-lg border border-blue-100 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto transition-opacity duration-200">
+                        User description of what the task is actually doing
+                      </span>
+                    </span>
+                  </div>
+                  <Textarea
+                    className="w-full p-3 border-2 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-lg font-mono text-sm mb-2 transition-all"
+                    rows={2}
+                    value={editDescription}
+                    onChange={e => setEditDescription(e.target.value)}
+                    placeholder="Describe this task's purpose or details"
                   />
                 </div>
-              )}
-              {/* Add more type-specific fields here */}
-              <DialogFooter>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </DialogFooter>
-            </form>
-          )}
+                {/* Per-type config fields */}
+                {editNode?.data?.type === 'HttpCallout' && (
+                  <>
+                    <div>
+                      <Label className="block text-sm font-medium mb-1">Method</Label>
+                      <select
+                        className="w-full p-2 border rounded text-sm mb-2"
+                        value={String(editConfig.method || 'GET')}
+                        onChange={e => setEditConfig({ ...editConfig, method: e.target.value })}
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="block text-sm font-medium mb-1">URL</Label>
+                      <Input
+                        className="w-full mb-2"
+                        value={String(editConfig.url || '')}
+                        onChange={e => setEditConfig({ ...editConfig, url: e.target.value })}
+                        placeholder="https://api.example.com"
+                      />
+                    </div>
+                    <div>
+                      <Label className="block text-sm font-medium mb-1">Timeout (seconds)</Label>
+                      <Input
+                        type="number"
+                        className="w-full mb-2"
+                        value={editConfig.timeoutSeconds !== undefined ? Number(editConfig.timeoutSeconds) : 30}
+                        onChange={e => setEditConfig({ ...editConfig, timeoutSeconds: Number(e.target.value) })}
+                        min={1}
+                        max={300}
+                      />
+                    </div>
+                    <div>
+                      <Label className="block text-sm font-medium mb-1">Content Type</Label>
+                      <Input
+                        className="w-full mb-2"
+                        value={String(editConfig.contentType || 'application/json')}
+                        onChange={e => setEditConfig({ ...editConfig, contentType: e.target.value })}
+                        placeholder="application/json"
+                      />
+                    </div>
+                    <div>
+                      <Label className="block text-sm font-medium mb-1">Headers (JSON)</Label>
+                      <Textarea
+                        className="w-full font-mono text-xs mb-2"
+                        rows={2}
+                        value={JSON.stringify(editConfig.headers || {}, null, 2)}
+                        onChange={e => {
+                          try {
+                            setEditConfig({ ...editConfig, headers: JSON.parse(e.target.value) });
+                          } catch { /* ignore JSON parse errors */ }
+                        }}
+                        placeholder={`{
+  "Authorization": "Bearer ..."
+}`}
+                      />
+                    </div>
+                    <div>
+                      <Label className="block text-sm font-medium mb-1">Authentication</Label>
+                      <Input
+                        className="w-full mb-2"
+                        value={isAuthType(editConfig.authentication) ? editConfig.authentication.type : 'none'}
+                        onChange={e => setEditConfig({ ...editConfig, authentication: { type: e.target.value } })}
+                        placeholder="none | basic | bearer"
+                      />
+                    </div>
+                  </>
+                )}
+                {editNode?.data?.type === 'Delay' && (
+                  <div>
+                    <Label className="block text-sm font-medium mb-1">Duration (ms)</Label>
+                    <Input
+                      type="number"
+                      className="w-full mb-2"
+                      value={editConfig.durationMilliseconds !== undefined ? Number(editConfig.durationMilliseconds) : 1000}
+                      onChange={e => setEditConfig({ ...editConfig, durationMilliseconds: Number(e.target.value) })}
+                      min={1}
+                      max={3600000}
+                    />
+                  </div>
+                )}
+                <div className="flex justify-end mt-6">
+                  <Button
+                    type="submit"
+                    className="w-full sm:w-auto transition-transform duration-150 ease-in-out shadow-lg bg-gradient-to-r from-blue-500 to-indigo-500 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-blue-300 focus:outline-none border-0 text-white font-semibold"
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <span className="flex items-center gap-2"><span className="animate-spin">⏳</span> Saving...</span>
+                    ) : 'Save'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         </DialogContent>
       </Dialog>
-    </div>
-  )
+    </>
+  );
 } 

@@ -38,6 +38,12 @@ public class CreateWorkflowNodeCommandHandler : IRequestHandler<CreateWorkflowNo
 
     public async Task<CreateWorkflowNodeResponse> Handle(CreateWorkflowNodeCommand request, CancellationToken cancellationToken)
     {
+        // Block creation of start node via this endpoint
+        if (request.Type == "start")
+        {
+            throw new InvalidOperationException("Cannot create a Start node via this endpoint. The Start node is created automatically with the workflow.");
+        }
+
         // Verify the workflow exists
         var workflow = await _context.Workflows.FindAsync(request.WorkflowId);
         if (workflow == null)

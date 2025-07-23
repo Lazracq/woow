@@ -286,6 +286,101 @@ src/
     └── execution.ts
 ```
 
+## Starting Node Management
+
+- **Automatic Creation:**
+  - The Start node (type: 'start') is created automatically by the backend when a new workflow is created.
+  - This node represents the entry point of the workflow and is required for execution.
+
+- **Uniqueness Enforcement:**
+  - Only one Start node is allowed per workflow.
+  - The backend enforces this rule: any attempt to create a Start node via the node creation API (POST /workflows/{workflowId}/nodes) will be rejected with an error.
+  - The frontend does not offer a Start node in the palette and never attempts to create one except as part of workflow creation.
+
+- **Node Creation API:**
+  - The node creation endpoint will throw an error if a request is made to create a node with type 'start'.
+  - All other node types (tasks, conditions, etc.) can be created via the API or UI palette as normal.
+
+- **Data Integrity:**
+  - If, due to legacy data or migration, multiple Start nodes exist for a workflow, a cleanup script or SQL query should be run to remove all but the oldest Start node per workflow.
+  - Example SQL (PostgreSQL):
+    ```sql
+    DELETE FROM "Tasks"
+    WHERE "Type" = 'start'
+    AND "Id" NOT IN (
+        SELECT MIN("Id") FROM "Tasks"
+        WHERE "Type" = 'start'
+        GROUP BY "WorkflowId"
+    );
+    ```
+
+- **Frontend Behavior:**
+  - The UI never allows the user to add a Start node from the palette.
+  - When loading a workflow, the frontend checks for the presence of a Start node and only triggers creation if none exists (should never happen in normal operation).
+
+- **Summary:**
+  - The Start node is a system-managed, unique node per workflow, created only at workflow creation time and never via user action or the node palette.
+
+## Task Types Implemented
+
+| Task Type      | Description                                      | Business Logic / Notes                                  |
+|--------------- |--------------------------------------------------|---------------------------------------------------------|
+| start          | Entry point node, created automatically          | Only one per workflow, not user-creatable               |
+| HttpCallout    | Call external APIs via HTTP(S)                   | Configurable method, URL, headers, etc.                 |
+| Delay          | Pause workflow for a specified duration           | Configurable duration in seconds                        |
+| Conditional    | Branch workflow based on a condition              | (If implemented) Configurable expression                |
+| Split          | Split execution into multiple branches            | (If implemented) Configurable number of branches        |
+| Parallel       | Run tasks in parallel                             | (If implemented)                                        |
+| Data Load      | Push data to SFTP or other storage                | (If implemented)                                        |
+| ...            | ...                                               | ...                                                     |
+
+**Note:** Only `start`, `HttpCallout`, and `Delay` are currently palette-available and fully supported end-to-end. Others may be partially implemented or planned.
+
+## Task Configuration Management
+
+- Each task type (Delay, HttpCallout, Start, etc.) has its own configuration class/file.
+- **userDescription**: All task configuration types include a `userDescription` field (string, long text) for user-editable notes or documentation. This is enforced in both backend (C# config classes) and frontend (TypeScript config types and forms).
+- The frontend always presents a User Description field in the node configuration modal, and this value is stored in the configuration JSON.
+- The backend validates that the configuration JSON matches the expected structure for the task type. Cross-type updates (e.g., Delay config for HttpCallout) are rejected.
+
+## Execution Data Handling
+
+- **inputData** and **outputData** fields in `ExecutionStep` are always stored as JSON (object or null).
+- `inputData` contains information about previous tasks and their outputs, enabling data flow between steps.
+- If a task output contains a file (e.g., generated or downloaded by a task), the file is stored in S3 under a folder named after the execution id. The `outputData` JSON includes a reference (URL or S3 key) to the file location.
+- This approach ensures that large or binary outputs do not bloat the database and are accessible for later steps or user download.
+
+---
+
+## Specification Implementation Checklist
+
+| Feature / Spec Element                | Status        | Notes                                                      |
+|---------------------------------------|--------------|------------------------------------------------------------|
+| Start node auto-creation              | Implemented  | Created with workflow, not user-creatable                  |
+| Start node uniqueness enforcement     | Implemented  | Backend blocks duplicate, frontend never offers            |
+| Node creation API (non-start types)   | Implemented  | Palette and API allow only valid task types                |
+| User-editable task description        | Implemented  | `UserDescription` field in Task entity                     |
+| Node position sync (only moved nodes) | Implemented  | Only changed nodes are synced via API                      |
+| Collapsible, categorized palette      | Implemented  | Only valid types shown, grouped by category                |
+| Fullscreen background theme sync      | Implemented  | Uses MutationObserver for light/dark mode                  |
+| Data cleanup for duplicate start nodes| Implemented  | SQL script provided, should be run once                    |
+| Batch node position update API        | Implemented  | Endpoint and frontend logic for batch updates              |
+| Advanced task types (Split, Parallel) | Partial/Pending | UI/logic may exist, but not fully supported in backend   |
+| Workflow execution engine             | Implemented  | (Assumed, if not, mark as pending)                         |
+| Real-time collaboration               | Partial/Pending | Collaboration API exists, but not fully integrated      |
+| Variable/trigger management           | Partial/Pending | Variable/trigger UI and backend exist, may need polish  |
+
+---
+
+**Legend:**
+- **Implemented:** Fully working and integrated
+- **Partial/Pending:** Some logic exists, but not fully supported or exposed
+- **Pending:** Not yet implemented
+
+---
+
+If you need more detail on any task type or feature, let me know!
+
 ## Development Phases
 
 ### Phase 1: Core Infrastructure

@@ -25,6 +25,7 @@ public class UpdateWorkflowNodeResponse
     public double PositionY { get; set; }
     public bool IsActive { get; set; }
     public List<string> Connections { get; set; } = new();
+    public string Configuration { get; set; } = string.Empty;
 }
 
 public class UpdateWorkflowNodeCommandHandler : IRequestHandler<UpdateWorkflowNodeCommand, UpdateWorkflowNodeResponse>
@@ -70,9 +71,11 @@ public class UpdateWorkflowNodeCommandHandler : IRequestHandler<UpdateWorkflowNo
         }
 
         // Update configuration if provided
+        bool configUpdated = false;
         if (!string.IsNullOrWhiteSpace(request.Configuration))
         {
             task.UpdateConfiguration(request.Configuration);
+            configUpdated = true;
         }
 
         // Update active status if provided
@@ -81,12 +84,13 @@ public class UpdateWorkflowNodeCommandHandler : IRequestHandler<UpdateWorkflowNo
             task.SetActive(request.IsActive.Value);
         }
 
-        // Update connections if provided
-        if (request.Connections != null)
+        // Update connections if provided and configuration was NOT updated
+        if (request.Connections != null && !configUpdated)
         {
-            // Store connections in the configuration as JSON
-            var connectionConfig = new { connections = request.Connections };
-            task.SetConfiguration(connectionConfig);
+            // Merge connections into existing config
+            var configObj = task.GetConfiguration<dynamic>() ?? new System.Dynamic.ExpandoObject();
+            configObj.connections = request.Connections;
+            task.UpdateConfiguration(System.Text.Json.JsonSerializer.Serialize(configObj));
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -99,7 +103,8 @@ public class UpdateWorkflowNodeCommandHandler : IRequestHandler<UpdateWorkflowNo
             PositionX = task.PositionX,
             PositionY = task.PositionY,
             IsActive = task.IsActive,
-            Connections = request.Connections ?? new List<string>()
+            Connections = request.Connections ?? new List<string>(),
+            Configuration = task.Configuration
         };
     }
 } 

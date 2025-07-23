@@ -34,6 +34,9 @@ public class Task : BaseEntity
 
     public DateTime CreatedAt { get; private set; }
 
+    [MaxLength(2000)]
+    public string? UserDescription { get; private set; }
+
     // Navigation properties
     public Guid WorkflowId { get; private set; }
     public virtual Workflow Workflow { get; private set; } = null!;
@@ -120,5 +123,10 @@ public class Task : BaseEntity
     public void SetConfiguration<T>(T configuration) where T : class
     {
         Configuration = JsonSerializer.Serialize(configuration);
+    }
+
+    public void UpdateUserDescription(string? description)
+    {
+        UserDescription = description?.Trim();
     }
 } 

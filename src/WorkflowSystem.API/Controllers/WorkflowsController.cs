@@ -245,6 +245,42 @@ namespace WorkflowSystem.API.Controllers
                 return StatusCode(500, new { error = "Failed to update workflow node", message = ex.Message });
             }
         }
+
+        [HttpPut("{workflowId}/nodes/positions")]
+        public async Task<IActionResult> BatchUpdateNodePositions(string workflowId, [FromBody] List<BatchNodePositionUpdateRequest> updates)
+        {
+            if (!Guid.TryParse(workflowId, out var workflowGuid))
+            {
+                return BadRequest(new { error = "Invalid workflow ID format" });
+            }
+            if (updates == null || updates.Count == 0)
+            {
+                return BadRequest(new { error = "No updates provided" });
+            }
+            try
+            {
+                foreach (var update in updates)
+                {
+                    if (!Guid.TryParse(update.NodeId, out var nodeGuid))
+                    {
+                        return BadRequest(new { error = $"Invalid node ID format: {update.NodeId}" });
+                    }
+                    var command = new UpdateWorkflowNodeCommand
+                    {
+                        WorkflowId = workflowGuid,
+                        NodeId = nodeGuid,
+                        PositionX = update.PositionX,
+                        PositionY = update.PositionY
+                    };
+                    await _mediator.Send(command);
+                }
+                return Ok(new { message = "Batch node positions updated successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to batch update node positions", message = ex.Message });
+            }
+        }
     }
 
     public class UpdateWorkflowNodeRequest
@@ -261,5 +297,12 @@ namespace WorkflowSystem.API.Controllers
     {
         public double X { get; set; }
         public double Y { get; set; }
+    }
+
+    public class BatchNodePositionUpdateRequest
+    {
+        public string NodeId { get; set; } = string.Empty;
+        public double PositionX { get; set; }
+        public double PositionY { get; set; }
     }
 } 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using WorkflowSystem.Domain.Entities;
-using Task = WorkflowSystem.Domain.Entities.Task;
+using TaskEntity = WorkflowSystem.Domain.Entities.Task;
 
 namespace WorkflowSystem.Domain.Strategies;
 
@@ -12,7 +12,7 @@ public class HttpCalloutTaskStrategy : ITaskStrategy
     public string Icon => "http";
     public bool IsConfigurable => true;
 
-    public async System.Threading.Tasks.Task<ExecutionStep> ExecuteAsync(Task task, ExecutionStep step, object? inputData, CancellationToken cancellationToken = default)
+    public async System.Threading.Tasks.Task<ExecutionStep> ExecuteAsync(TaskEntity task, ExecutionStep step, object? inputData, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -113,10 +113,8 @@ public class HttpCalloutTaskStrategy : ITaskStrategy
             TimeoutSeconds = 30,
             ContentType = "application/json",
             Headers = new Dictionary<string, string>(),
-            Authentication = new HttpAuthentication
-            {
-                Type = "none"
-            }
+            Authentication = new HttpAuthentication { Type = "none" },
+            UserDescription = string.Empty
         };
     }
 
@@ -125,7 +123,7 @@ public class HttpCalloutTaskStrategy : ITaskStrategy
         try
         {
             var config = JsonSerializer.Deserialize<HttpCalloutConfiguration>(configuration);
-            return config != null && 
+            return config != null &&
                    !string.IsNullOrWhiteSpace(config.Url) &&
                    Uri.IsWellFormedUriString(config.Url, UriKind.Absolute);
         }
@@ -197,6 +195,10 @@ public class HttpCalloutTaskStrategy : ITaskStrategy
                             ["type"] = "string"
                         }
                     }
+                },
+                ["userDescription"] = new Dictionary<string, object>
+                {
+                    ["type"] = "string"
                 }
             },
             ["required"] = new[] { "url" }
@@ -215,6 +217,7 @@ public class HttpCalloutConfiguration
     public string? Body { get; set; }
     public Dictionary<string, string>? Headers { get; set; }
     public HttpAuthentication? Authentication { get; set; }
+    public string? UserDescription { get; set; }
 }
 
 public class HttpAuthentication

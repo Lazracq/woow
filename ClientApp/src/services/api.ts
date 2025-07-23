@@ -107,10 +107,39 @@ export interface ExecutionDetails extends Execution {
 }
 
 export interface ExecutionStep {
-  id: string
-  name: string
-  status: string
-  duration: string
+  id: string;
+  name: string;
+  status: string;
+  duration: string;
+  inputData: Record<string, unknown> | null;
+  outputData: Record<string, unknown> | null;
+}
+
+// Task configuration types
+export interface DelayTaskConfig {
+  durationMilliseconds: number;
+  userDescription?: string;
+}
+
+export interface HttpCalloutTaskConfig {
+  method: string;
+  url: string;
+  timeoutSeconds?: number;
+  contentType?: string;
+  body?: string;
+  headers?: Record<string, string>;
+  authentication?: {
+    type: string;
+    username?: string;
+    password?: string;
+    token?: string;
+    headerName?: string;
+  };
+  userDescription?: string;
+}
+
+export interface StartNodeConfig {
+  userDescription?: string;
 }
 
 class ApiService {

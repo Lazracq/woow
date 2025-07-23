@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WorkflowSystem.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0d745fc19cc91ad0c120b5abdb7fea2aadf028be")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6199d200bab35a7ea93f42d40d88e36671a97201")]
 [assembly: System.Reflection.AssemblyProductAttribute("WorkflowSystem.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WorkflowSystem.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
