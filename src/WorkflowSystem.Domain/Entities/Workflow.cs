@@ -4,43 +4,35 @@ using WorkflowSystem.Domain.ValueObjects;
 
 namespace WorkflowSystem.Domain.Entities;
 
-public class Workflow : BaseEntity
+public class Workflow(string name, string? description = null) : BaseEntity
 {
-    public Workflow(string name, string? description = null)
-    {
-        Name = name;
-        Description = description;
-        Tasks = new List<Task>();
-        Variables = new List<Variable>();
-        Triggers = new List<Trigger>();
-        Executions = new List<Execution>();
-        IsActive = true;
-        CreatedAt = DateTime.UtcNow;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
     [Required]
     [StringLength(255)]
-    public string Name { get; private set; }
+    public string Name { get; private set; } = name;
 
     [StringLength(2000)]
-    public string? Description { get; private set; }
+    public string? Description { get; private set; } = description;
 
-    public bool IsActive { get; private set; }
+    public bool IsActive { get; private set; } = true;
 
     public WorkflowStatus Status { get; private set; } = WorkflowStatus.Draft;
 
-    public DateTime CreatedAt { get; private set; }
+    public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
-    public DateTime UpdatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; } = DateTime.UtcNow;
 
     public Guid CreatedBy { get; private set; }
 
+    public string Priority { get; private set; } = "medium";
+    public string Complexity { get; private set; } = "medium";
+    public ICollection<string> Tags { get; private set; } = [];
+
     // Navigation properties
-    public virtual ICollection<Task> Tasks { get; private set; }
-    public virtual ICollection<Variable> Variables { get; private set; }
-    public virtual ICollection<Trigger> Triggers { get; private set; }
-    public virtual ICollection<Execution> Executions { get; private set; }
+    public virtual ICollection<Task> Tasks { get; private set; } = [];
+    public virtual ICollection<Variable> Variables { get; private set; } = [];
+    public virtual ICollection<Trigger> Triggers { get; private set; } = [];
+    public virtual ICollection<Execution> Executions { get; private set; } = [];
+    public virtual ICollection<Connection> Connections { get; private set; } = [];
 
     // Business methods
     public void UpdateName(string name)

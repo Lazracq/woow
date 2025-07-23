@@ -42,6 +42,7 @@ public class WorkflowRepository : IWorkflowRepository
             .Include(w => w.Variables)
             .Include(w => w.Triggers)
             .Include(w => w.Executions)
+            .Include(w => w.Connections)
             .FirstOrDefaultAsync(w => w.Id == id, cancellationToken);
 
         // Cache the result

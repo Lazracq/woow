@@ -12,6 +12,7 @@ public interface IApplicationDbContext
     DbSet<Trigger> Triggers { get; }
     DbSet<Execution> Executions { get; }
     DbSet<ExecutionStep> ExecutionSteps { get; }
+    DbSet<Connection> Connections { get; }
 
-    Task<int> SaveChangesAsync(CancellationToken cancellationToken);
+    System.Threading.Tasks.Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 } 

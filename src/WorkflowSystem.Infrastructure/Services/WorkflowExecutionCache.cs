@@ -7,16 +7,6 @@ using Task = WorkflowSystem.Domain.Entities.Task;
 
 namespace WorkflowSystem.Infrastructure.Services;
 
-public interface IWorkflowExecutionCache
-{
-    System.Threading.Tasks.Task<Execution?> GetExecutionAsync(Guid executionId);
-    System.Threading.Tasks.Task SetExecutionAsync(Guid executionId, Execution execution, TimeSpan? expiration = null);
-    System.Threading.Tasks.Task RemoveExecutionAsync(Guid executionId);
-    System.Threading.Tasks.Task<Workflow?> GetWorkflowAsync(Guid workflowId);
-    System.Threading.Tasks.Task SetWorkflowAsync(Guid workflowId, Workflow workflow, TimeSpan? expiration = null);
-    System.Threading.Tasks.Task RemoveWorkflowAsync(Guid workflowId);
-}
-
 public class WorkflowExecutionCache : IWorkflowExecutionCache
 {
     private readonly IDistributedCache _cache;

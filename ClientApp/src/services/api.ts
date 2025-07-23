@@ -15,6 +15,8 @@ export interface Workflow {
   tags: string[]
   priority: string
   complexity: string
+  tasks: WorkflowNode[];
+  connections: Connection[];
 }
 
 export interface WorkflowNode {
@@ -49,7 +51,10 @@ export interface UpdateWorkflowNodeRequest {
 }
 
 export interface AddConnectionRequest {
-  targetNodeId: string
+  fromTaskId: string;
+  toTaskId: string;
+  associationType: string;
+  label?: string;
 }
 
 export interface WorkflowStats {
@@ -142,6 +147,14 @@ export interface StartNodeConfig {
   userDescription?: string;
 }
 
+export interface Connection {
+  id: string;
+  fromTaskId: string;
+  toTaskId: string;
+  associationType: string;
+  label?: string;
+}
+
 class ApiService {
   private baseUrl: string
 
@@ -166,7 +179,12 @@ class ApiService {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
+      // Handle empty response (e.g., DELETE)
+      const contentType = response.headers.get('content-type');
+      if (response.status === 204 || !contentType || contentType.indexOf('application/json') === -1) {
+        // @ts-expect-error: Allow undefined return for empty responses (e.g., DELETE)
+        return undefined;
+      }
       return await response.json()
     } catch (error) {
       console.error('API request failed:', error)
@@ -201,7 +219,7 @@ class ApiService {
 
   async getWorkflowById(id: string): Promise<Workflow> {
     console.log('Fetching workflow by ID...')
-    return this.request<Workflow>(`/workflows/workflow/${id}`)
+    return this.request<Workflow>(`/workflows/${id}`)
   }
 
   async createWorkflow(workflow: Partial<Workflow>): Promise<Workflow> {
@@ -256,19 +274,19 @@ class ApiService {
     })
   }
 
-  async addConnection(workflowId: string, nodeId: string, connection: AddConnectionRequest): Promise<{ message: string }> {
-    console.log('Adding connection...')
-    return this.request<{ message: string }>(`/workflows/${workflowId}/nodes/${nodeId}/connections`, {
+  async addConnection(workflowId: string, connection: AddConnectionRequest): Promise<{ message: string }> {
+    console.log('Adding connection...');
+    return this.request<{ message: string }>(`/workflows/${workflowId}/connections`, {
       method: 'POST',
       body: JSON.stringify(connection),
-    })
+    });
   }
 
-  async removeConnection(workflowId: string, nodeId: string, targetNodeId: string): Promise<void> {
-    console.log('Removing connection...')
-    return this.request<void>(`/workflows/${workflowId}/nodes/${nodeId}/connections/${targetNodeId}`, {
+  async removeConnection(workflowId: string, connectionId: string): Promise<{ message: string }> {
+    console.log('Removing connection...');
+    return this.request<{ message: string }>(`/workflows/${workflowId}/connections/${connectionId}`, {
       method: 'DELETE',
-    })
+    });
   }
 
   async setStartingNode(workflowId: string, nodeId: string): Promise<{ message: string }> {

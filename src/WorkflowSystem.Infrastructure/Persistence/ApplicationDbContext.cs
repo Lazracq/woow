@@ -21,6 +21,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Trigger> Triggers => Set<Trigger>();
     public DbSet<Execution> Executions => Set<Execution>();
     public DbSet<ExecutionStep> ExecutionSteps => Set<ExecutionStep>();
+    public DbSet<Connection> Connections => Set<Connection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

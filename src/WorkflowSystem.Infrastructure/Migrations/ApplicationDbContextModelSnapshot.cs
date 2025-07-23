@@ -22,6 +22,41 @@ namespace WorkflowSystem.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("WorkflowSystem.Domain.Entities.Connection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AssociationType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("FromTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("ToTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkflowId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromTaskId");
+
+                    b.HasIndex("ToTaskId");
+
+                    b.HasIndex("WorkflowId");
+
+                    b.ToTable("Connections", (string)null);
+                });
+
             modelBuilder.Entity("WorkflowSystem.Domain.Entities.Execution", b =>
                 {
                     b.Property<Guid>("Id")
@@ -249,6 +284,11 @@ namespace WorkflowSystem.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Complexity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -269,7 +309,16 @@ namespace WorkflowSystem.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Tags")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -279,6 +328,33 @@ namespace WorkflowSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Workflows", (string)null);
+                });
+
+            modelBuilder.Entity("WorkflowSystem.Domain.Entities.Connection", b =>
+                {
+                    b.HasOne("WorkflowSystem.Domain.Entities.Task", "FromTask")
+                        .WithMany("OutgoingConnections")
+                        .HasForeignKey("FromTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WorkflowSystem.Domain.Entities.Task", "ToTask")
+                        .WithMany("IncomingConnections")
+                        .HasForeignKey("ToTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("WorkflowSystem.Domain.Entities.Workflow", "Workflow")
+                        .WithMany("Connections")
+                        .HasForeignKey("WorkflowId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FromTask");
+
+                    b.Navigation("ToTask");
+
+                    b.Navigation("Workflow");
                 });
 
             modelBuilder.Entity("WorkflowSystem.Domain.Entities.Execution", b =>
@@ -352,10 +428,16 @@ namespace WorkflowSystem.Infrastructure.Migrations
             modelBuilder.Entity("WorkflowSystem.Domain.Entities.Task", b =>
                 {
                     b.Navigation("ExecutionSteps");
+
+                    b.Navigation("IncomingConnections");
+
+                    b.Navigation("OutgoingConnections");
                 });
 
             modelBuilder.Entity("WorkflowSystem.Domain.Entities.Workflow", b =>
                 {
+                    b.Navigation("Connections");
+
                     b.Navigation("Executions");
 
                     b.Navigation("Tasks");

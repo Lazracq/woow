@@ -41,7 +41,10 @@ public class Task : BaseEntity
     public Guid WorkflowId { get; private set; }
     public virtual Workflow Workflow { get; private set; } = null!;
 
-    public virtual ICollection<ExecutionStep> ExecutionSteps { get; private set; } = new List<ExecutionStep>();
+    public virtual ICollection<ExecutionStep> ExecutionSteps { get; private set; } = [];
+
+    public virtual ICollection<Connection> OutgoingConnections { get; set; } = new List<Connection>();
+    public virtual ICollection<Connection> IncomingConnections { get; set; } = new List<Connection>();
 
     // Business methods
     public void UpdateName(string name)

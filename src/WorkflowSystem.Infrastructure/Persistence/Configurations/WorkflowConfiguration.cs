@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using WorkflowSystem.Domain.Entities;
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace WorkflowSystem.Infrastructure.Persistence.Configurations;
 
@@ -37,6 +39,24 @@ public class WorkflowConfiguration : IEntityTypeConfiguration<Workflow>
         builder.Property(w => w.CreatedBy)
             .IsRequired();
 
+        builder.Property(w => w.Priority)
+            .HasMaxLength(50)
+            .IsRequired();
+        builder.Property(w => w.Complexity)
+            .HasMaxLength(50)
+            .IsRequired();
+            
+        var serializerOptions = new JsonSerializerOptions();
+        var tagsConverter = new ValueConverter<ICollection<string>, string>(
+            v => JsonSerializer.Serialize(v ?? new List<string>(), serializerOptions),
+            v => string.IsNullOrWhiteSpace(v)
+                ? new List<string>()
+                : (JsonSerializer.Deserialize<List<string>>(v, serializerOptions) ?? new List<string>())
+        );
+        builder.Property(w => w.Tags)
+            .HasConversion(tagsConverter)
+            .HasColumnType("text");
+
         // Relationships
         builder.HasMany(w => w.Tasks)
             .WithOne(t => t.Workflow)
@@ -58,4 +78,4 @@ public class WorkflowConfiguration : IEntityTypeConfiguration<Workflow>
             .HasForeignKey(e => e.WorkflowId)
             .OnDelete(DeleteBehavior.Cascade);
     }
-} 
+}

@@ -18,13 +18,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, Trash2, Maximize2, Info } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { nodeTypes } from './nodeTypes';
+import { NodeHandlerContext } from './NodeHandlerContext';
+import { nodeTypes } from './nodeTypesMap';
 import { apiService } from '@/services/api';
 import { debounce } from 'lodash';
 import { uniqBy } from 'lodash';
 import type { DelayTaskConfig, HttpCalloutTaskConfig, StartNodeConfig } from '@/services/api';
 import type { Node } from 'reactflow';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -99,6 +100,7 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editNode, setEditNode] = useState<Node<NodeData> | null>(null);
+  const [deleteNode, setDeleteNode] = useState<Node<NodeData> | null>(null);
   const [editDescription, setEditDescription] = useState('');
   const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
   const lastSavedPositions = useRef<Record<string, { x: number; y: number }>>({});
@@ -116,75 +118,50 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
 
   // Load workflow data from API
   useEffect(() => {
-    const loadWorkflowData = async () => {
+    const loadWorkflow = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
-        const workflowNodes = await apiService.getWorkflowNodes(workflowId);
-        if (workflowNodes && workflowNodes.length > 0) {
-          const reactFlowNodes: Node<NodeData>[] = workflowNodes.map(node => ({
-            id: node.id,
-            type: node.isStartingNode || node.type === 'start' ? 'startingNode' : 'taskNode',
-            position: { x: node.positionX, y: node.positionY },
-            data: {
-              label: node.name,
-              type: node.type || 'http',
-              description: node.configuration ? JSON.parse(node.configuration).description || `Task ${node.name}` : `Task ${node.name}`,
-              isActive: node.isActive,
-              config: node.configuration ? JSON.parse(node.configuration) : {},
-            },
-          }));
-          const reactFlowEdges: Edge[] = [];
-          workflowNodes.forEach(node => {
-            node.connections.forEach(targetNodeId => {
-              if (typeof targetNodeId === 'string') {
-                reactFlowEdges.push({
-                  id: `${node.id}-${targetNodeId}`,
-                  source: node.id,
-                  target: targetNodeId,
-                  sourceHandle: 'onExecute',
-                  targetHandle: 'target',
-                  type: 'smoothstep',
-                  markerEnd: {
-                    type: MarkerType.ArrowClosed,
-                    width: 20,
-                    height: 20,
-                    color: '#10b981',
-                  },
-                  style: { stroke: '#10b981', strokeWidth: 2 },
-                  label: 'On Execute',
-                  labelStyle: { fill: '#10b981', fontWeight: 600 },
-                  labelBgStyle: { fill: '#ffffff', fillOpacity: 0.8 },
-                });
-              }
-            });
-          });
-          setNodes(reactFlowNodes);
-          setEdges(reactFlowEdges);
-        } else {
-          await createStartingNode();
-        }
-      } catch {
-        setError('Failed to load workflow data. Please try again.');
-        try {
-          await createStartingNode();
-        } catch {
-          setNodes([
-            {
-              id: 'start',
-              type: 'startingNode',
-              position: { x: 50, y: 200 },
-              data: { label: 'Start Workflow' },
-            },
-          ]);
-          setEdges([]);
-        }
+        const workflow = await apiService.getWorkflowById(workflowId);
+        // Build nodes
+        const reactFlowNodes: Node<NodeData>[] = (workflow.tasks || []).map(task => ({
+          id: task.id,
+          type: task.type === 'start' ? 'startingNode' : 'taskNode',
+          position: { x: task.positionX, y: task.positionY },
+          data: {
+            label: task.name,
+            type: task.type || 'http',
+            description: task.configuration ? (JSON.parse(task.configuration).description || `Task ${task.name}`) : `Task ${task.name}`,
+            isActive: task.isActive,
+            config: task.configuration ? JSON.parse(task.configuration) : {},
+          },
+        }));
+        // Build edges from connections
+        const reactFlowEdges: Edge[] = (workflow.connections || []).map(conn => ({
+          id: conn.id,
+          source: conn.fromTaskId,
+          target: conn.toTaskId,
+          sourceHandle: conn.associationType,
+          type: 'smoothstep',
+          label: conn.label || conn.associationType,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+            color: '#10b981',
+          },
+          style: { stroke: '#10b981', strokeWidth: 2 },
+        }));
+        setNodes(reactFlowNodes);
+        setEdges(reactFlowEdges);
+      } catch (err) {
+        setError('Failed to load workflow. Please try again.');
       } finally {
         setLoading(false);
       }
     };
-    if (workflowId) loadWorkflowData();
-  }, [workflowId, setNodes]);
+    if (workflowId) loadWorkflow();
+  }, [workflowId]);
 
   // Create starting node if needed
   const createStartingNode = useCallback(async () => {
@@ -315,7 +292,7 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
   }, 500), [workflowId]);
 
   const onConnect = useCallback(
-    (params: Connection) => {
+    async (params: Connection) => {
       if (!params.source || !params.target) return;
       const sourceNode = nodes.find(n => n.id === params.source);
       const isConditional = sourceNode?.data?.type === 'Conditional';
@@ -330,10 +307,17 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
         }
       }
       let label = '';
-      if (isStartNode) label = 'On Execute';
-      else if (params.sourceHandle === 'onSuccess') label = 'On Success';
-      else if (params.sourceHandle === 'onFailure') label = 'On Failure';
-      else if (isConditional) label = params.sourceHandle || 'Case';
+      let associationType = params.sourceHandle || '';
+      if (isStartNode) {
+        label = 'On Execute';
+        associationType = 'onExecute';
+      } else if (params.sourceHandle === 'onSuccess') {
+        label = 'On Success';
+      } else if (params.sourceHandle === 'onFailure') {
+        label = 'On Failure';
+      } else if (isConditional) {
+        label = params.sourceHandle || 'Case';
+      }
       const labelStyle = {
         fill: isStartNode
           ? '#10b981'
@@ -370,9 +354,20 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
           strokeWidth: 2,
         },
       };
-      setEdges((eds) => addEdge(newEdge, eds));
+      // Persist the connection to the backend
+      try {
+        await apiService.addConnection(workflowId, {
+          fromTaskId: params.source,
+          toTaskId: params.target,
+          associationType,
+          label,
+        });
+        setEdges((eds) => addEdge(newEdge, eds));
+      } catch {
+        setError('Failed to save connection. Please try again.');
+      }
     },
-    [setEdges, edges, nodes]
+    [setEdges, edges, nodes, workflowId]
   );
 
   const addTaskNode = useCallback(async () => {
@@ -484,37 +479,20 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
     };
   }, []);
 
-  // Listen for 'editNode' event to open modal from nodeTypes
-  React.useEffect(() => {
-    const handler = (event: Event) => {
-      const customEvent = event as CustomEvent<{ id: string; data: NodeData }>;
-      const node = nodes.find(n => n.id === customEvent.detail.id);
-      if (node) {
-        setEditNode(node);
-        const config = (node.data.config ?? {}) as Record<string, unknown>;
-        setEditDescription(typeof config.userDescription === 'string' ? config.userDescription : '');
-        setEditConfig(config);
-      }
-    };
-    window.addEventListener('editNode', handler as EventListener);
-    return () => window.removeEventListener('editNode', handler as EventListener);
+  // Callbacks to pass to node components
+  const handleEditNode = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      setEditNode(node);
+      const config = (node.data.config ?? {}) as Record<string, unknown>;
+      setEditDescription(typeof config.userDescription === 'string' ? config.userDescription : '');
+      setEditConfig(config);
+    }
   }, [nodes]);
-
-  // Listen for 'deleteNode' event to handle node deletion
-  React.useEffect(() => {
-    const handler = async (event: Event) => {
-      const customEvent = event as CustomEvent<{ id: string }>;
-      const nodeId = customEvent.detail.id;
-      try {
-        await apiService.deleteWorkflowNode(workflowId, nodeId);
-        setNodes(nds => nds.filter(n => n.id !== nodeId));
-      } catch {
-        setError('Failed to delete node.');
-      }
-    };
-    window.addEventListener('deleteNode', handler as EventListener);
-    return () => window.removeEventListener('deleteNode', handler as EventListener);
-  }, [workflowId, setNodes]);
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) setDeleteNode(node);
+  }, [nodes]);
 
   return (
     <>
@@ -586,22 +564,24 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
               <span className="text-lg ml-2">Loading workflow...</span>
             </div>
           ) : (
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChangeCustom}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onNodeClick={(_, node) => openEditModal(node)}
-              nodeTypes={nodeTypes}
-              proOptions={{ hideAttribution: true }}
-              fitView
-              attributionPosition="bottom-left"
-            >
-              <Background />
-              <Controls />
-              <MiniMap />
-            </ReactFlow>
+            <NodeHandlerContext.Provider value={{ onEdit: handleEditNode, onDelete: handleDeleteNode }}>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChangeCustom}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={(_, node) => handleEditNode(node.id)}
+                nodeTypes={nodeTypes}
+                proOptions={{ hideAttribution: true }}
+                fitView
+                attributionPosition="bottom-left"
+              >
+                <Background />
+                <Controls />
+                <MiniMap />
+              </ReactFlow>
+            </NodeHandlerContext.Provider>
           )}
         </div>
         {/* Collapsible Palette Sidebar */}
@@ -644,7 +624,7 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
       </div>
 
       {/* Edit Node Modal */}
-      <Dialog open={!!editNode} onOpenChange={open => { if (!open) setEditNode(null); }}>
+      <Dialog open={!!editNode && !deleteNode} onOpenChange={open => { if (!open) setEditNode(null); }}>
         <DialogContent className="p-0 bg-transparent border-none shadow-none">
           <Card className="w-full max-w-lg mx-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up">
             <CardHeader className="border-b border-gray-200 dark:border-gray-700 pb-4 flex flex-col items-start gap-2 relative border-0">
@@ -821,6 +801,46 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Node Modal */}
+      <Dialog open={!!deleteNode} onOpenChange={open => { if (!open) setDeleteNode(null); }}>
+        <DialogContent className="p-0 bg-transparent border-none shadow-none">
+          <Card className="w-full max-w-md mx-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up">
+            <CardHeader className="border-b border-gray-200 dark:border-gray-700 pb-4 flex flex-col items-start gap-2 relative border-0">
+              <DialogTitle asChild>
+                <span className="text-2xl font-extrabold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
+                  Delete Node
+                </span>
+              </DialogTitle>
+              <DialogDescription asChild>
+                <span className="dark:text-gray-300 mt-1 ml-1">
+                  Are you sure you want to delete this node? This action cannot be undone.
+                </span>
+              </DialogDescription>
+              <div className="w-full h-px bg-gradient-to-r from-red-400/60 via-orange-300/30 to-transparent mt-1" />
+            </CardHeader>
+            <CardContent className="py-4">
+              <div className="flex justify-end gap-2 mt-2">
+                <Button type="button" variant="outline" onClick={() => setDeleteNode(null)}>
+                  Cancel
+                </Button>
+                <Button type="button" className="bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold shadow-lg" onClick={async () => {
+                  if (deleteNode) {
+                    try {
+                      await apiService.deleteWorkflowNode(workflowId, deleteNode.id);
+                      setNodes(nds => nds.filter(n => n.id !== deleteNode.id));
+                      setDeleteNode(null);
+                    } catch {
+                      setError('Failed to delete node.');
+                    }
+                  }
+                }}>
+                  Delete
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </DialogContent>

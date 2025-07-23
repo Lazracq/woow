@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings, Trash2, Play, Plug, PlugZap } from 'lucide-react';
-import { Handle, Position } from 'reactflow';
+import { Handle, Position, NodeProps } from 'reactflow';
 import { NODE_TYPE_STYLES, getNodeDescription } from './WorkflowNodeUtils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { NodeHandlerContext, NodeHandlerContextType } from './NodeHandlerContext';
 
 export interface NodeData {
   label: string;
@@ -14,23 +14,18 @@ export interface NodeData {
   config?: Record<string, unknown>;
 }
 
-export const TaskNode = ({ data, id }: { data: NodeData; id: string }) => {
+export const TaskNode = (props: NodeProps<NodeData>) => {
+  const { onEdit, onDelete } = React.useContext(NodeHandlerContext) as NodeHandlerContextType;
+  const { data, id } = props;
   const style = NODE_TYPE_STYLES[data.type || 'HttpCallout'] || NODE_TYPE_STYLES['HttpCallout'];
-  const [showDeleteModal, setShowDeleteModal] = React.useState(false);
-  // Prevent edit modal from opening after delete modal closes
-  const ignoreNextEdit = React.useRef(false);
-
   return (
-    <Card className={`w-64 border-2 ${style.border} ${style.bg} group relative`}>
+    <Card className={`w-80 h-48 border-2 ${style.border} ${style.bg} group relative`}>
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <button
           className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
           onClick={e => {
             e.stopPropagation();
-            if (!ignoreNextEdit.current) {
-              window.dispatchEvent(new CustomEvent('editNode', { detail: { id, data } }));
-            }
-            ignoreNextEdit.current = false;
+            onEdit(id);
           }}
           title="Edit Description"
         >
@@ -40,7 +35,7 @@ export const TaskNode = ({ data, id }: { data: NodeData; id: string }) => {
           className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900"
           onClick={e => {
             e.stopPropagation();
-            setShowDeleteModal(true);
+            onDelete(id);
           }}
           title="Delete"
         >
@@ -53,7 +48,7 @@ export const TaskNode = ({ data, id }: { data: NodeData; id: string }) => {
             className="focus:outline-none"
             onClick={e => {
               e.stopPropagation();
-              window.dispatchEvent(new CustomEvent('editNode', { detail: { id, data } }));
+              onEdit(id);
             }}
             title="Edit Node Description"
             type="button"
@@ -123,59 +118,22 @@ export const TaskNode = ({ data, id }: { data: NodeData; id: string }) => {
           }}
         />
       </CardContent>
-      <Dialog open={showDeleteModal} onOpenChange={open => {
-        if (!open) {
-          // Block next edit event
-          ignoreNextEdit.current = true;
-        }
-        setShowDeleteModal(open);
-      }}>
-        <DialogContent className="p-0 bg-transparent border-none shadow-none">
-          <Card className="w-full max-w-md mx-auto rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 animate-fade-in-up">
-            <CardHeader className="border-b border-gray-200 dark:border-gray-700 pb-4 flex flex-col items-start gap-2 relative border-0">
-              {/* For accessibility, ensure DialogTitle is present as a direct child of DialogContent */}
-              <DialogTitle asChild>
-                <span className="text-2xl font-extrabold bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent">
-                  Delete Node
-                </span>
-              </DialogTitle>
-              <DialogDescription asChild>
-                <span className="dark:text-gray-300 mt-1 ml-1">
-                  Are you sure you want to delete this node? This action cannot be undone.
-                </span>
-              </DialogDescription>
-              <div className="w-full h-px bg-gradient-to-r from-red-400/60 via-orange-300/30 to-transparent mt-1" />
-            </CardHeader>
-            <CardContent className="py-4">
-              <div className="flex justify-end gap-2 mt-2">
-                <Button type="button" variant="outline" onClick={() => setShowDeleteModal(false)}>
-                  Cancel
-                </Button>
-                <Button type="button" className="bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold shadow-lg" onClick={async () => {
-                  setShowDeleteModal(false);
-                  window.dispatchEvent(new CustomEvent('deleteNode', { detail: { id } }));
-                }}>
-                  Delete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 };
 
-export const StartingNode = ({ data, id }: { data: NodeData; id: string }) => {
+export const StartingNode = (props: NodeProps<NodeData>) => {
+  const { onEdit } = React.useContext(NodeHandlerContext) as NodeHandlerContextType;
+  const { data, id } = props;
   const [showStartModal, setShowStartModal] = useState(false);
   return (
-    <Card className="w-[340px] h-[220px] border-2 border-green-500 bg-green-50 dark:bg-green-900/20 flex flex-col items-center justify-center relative group rounded-xl">
+    <Card className="w-80 h-48 border-2 border-green-500 bg-green-50 dark:bg-green-900/20 flex flex-col items-center justify-center relative group rounded-xl">
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <button
           className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
           onClick={e => {
             e.stopPropagation();
-            window.dispatchEvent(new CustomEvent('editNode', { detail: { id, data } }));
+            onEdit(id);
           }}
           title="Edit Description"
         >
@@ -228,9 +186,4 @@ export const StartingNode = ({ data, id }: { data: NodeData; id: string }) => {
       </Dialog>
     </Card>
   );
-};
-
-export const nodeTypes = {
-  startingNode: StartingNode,
-  taskNode: TaskNode,
 }; 

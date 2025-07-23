@@ -7,6 +7,8 @@ using WorkflowSystem.Application.Workflows.Queries.GetWorkflowNodes;
 using WorkflowSystem.Application.Workflows.Commands.UpdateWorkflowNode;
 using WorkflowSystem.Application.Workflows.Commands.CreateWorkflowNode;
 using WorkflowSystem.Application.Workflows.Commands.DeleteWorkflowNode;
+using WorkflowSystem.Application.Workflows.Commands.AddConnection;
+using WorkflowSystem.Application.Workflows.Commands.DeleteConnection;
 
 namespace WorkflowSystem.API.Controllers
 {
@@ -49,7 +51,7 @@ namespace WorkflowSystem.API.Controllers
             }
         }
 
-        [HttpGet("workflow/{id}")]
+        [HttpGet("{id}")]
         public async Task<IActionResult> GetWorkflowById(string id)
         {
             try
@@ -314,6 +316,67 @@ namespace WorkflowSystem.API.Controllers
                 return StatusCode(500, new { error = "Failed to delete workflow node", message = ex.Message });
             }
         }
+
+        [HttpPost("{workflowId}/connections")]
+        public async Task<IActionResult> AddConnection(string workflowId, [FromBody] AddConnectionRequest request)
+        {
+            try
+            {
+                if (!Guid.TryParse(workflowId, out var workflowGuid))
+                {
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
+                if (!Guid.TryParse(request.FromTaskId, out var fromTaskGuid))
+                {
+                    return BadRequest(new { error = "Invalid from task ID format" });
+                }
+                if (!Guid.TryParse(request.ToTaskId, out var toTaskGuid))
+                {
+                    return BadRequest(new { error = "Invalid to task ID format" });
+                }
+                var command = new AddConnectionCommand
+                {
+                    WorkflowId = workflowGuid,
+                    NodeId = fromTaskGuid,
+                    TargetNodeId = toTaskGuid,
+                    AssociationType = request.AssociationType,
+                    Label = request.Label
+                };
+                await _mediator.Send(command);
+                return Ok(new { message = "Connection added successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to add connection", message = ex.Message });
+            }
+        }
+
+        [HttpDelete("{workflowId}/connections/{connectionId}")]
+        public async Task<IActionResult> DeleteConnection(string workflowId, string connectionId)
+        {
+            try
+            {
+                if (!Guid.TryParse(workflowId, out var workflowGuid))
+                {
+                    return BadRequest(new { error = "Invalid workflow ID format" });
+                }
+                if (!Guid.TryParse(connectionId, out var connectionGuid))
+                {
+                    return BadRequest(new { error = "Invalid connection ID format" });
+                }
+                var command = new DeleteConnectionCommand
+                {
+                    WorkflowId = workflowGuid,
+                    ConnectionId = connectionGuid
+                };
+                await _mediator.Send(command);
+                return Ok(new { message = "Connection deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to delete connection", message = ex.Message });
+            }
+        }
     }
 
     public class UpdateWorkflowNodeRequest
@@ -337,5 +400,13 @@ namespace WorkflowSystem.API.Controllers
         public string NodeId { get; set; } = string.Empty;
         public double PositionX { get; set; }
         public double PositionY { get; set; }
+    }
+
+    public class AddConnectionRequest
+    {
+        public string FromTaskId { get; set; } = string.Empty;
+        public string ToTaskId { get; set; } = string.Empty;
+        public string AssociationType { get; set; } = string.Empty;
+        public string? Label { get; set; }
     }
 } 
