@@ -1,3 +1,5 @@
+import { sanitizeInput } from '@/lib/utils';
+
 export interface Workflow {
   id: string
   name: string
@@ -252,19 +254,33 @@ class ApiService {
   }
 
   async createWorkflowNode(workflowId: string, node: CreateWorkflowNodeRequest): Promise<WorkflowNode> {
-    console.log('Creating workflow node...')
+    console.log('Creating workflow node...');
+    // Sanitize user input
+    const sanitizedNode = {
+      ...node,
+      name: sanitizeInput(node.name),
+      configuration: typeof node.configuration === 'string' ? sanitizeInput(node.configuration) : node.configuration,
+      connections: node.connections?.map(sanitizeInput),
+    };
     return this.request<WorkflowNode>(`/workflows/${workflowId}/nodes`, {
       method: 'POST',
-      body: JSON.stringify(node),
-    })
+      body: JSON.stringify(sanitizedNode),
+    });
   }
 
   async updateWorkflowNode(workflowId: string, nodeId: string, node: UpdateWorkflowNodeRequest): Promise<WorkflowNode> {
-    console.log('Updating workflow node...')
+    console.log('Updating workflow node...');
+    // Sanitize user input
+    const sanitizedNode = {
+      ...node,
+      name: node.name ? sanitizeInput(node.name) : undefined,
+      configuration: node.configuration ? sanitizeInput(node.configuration) : undefined,
+      connections: node.connections?.map(sanitizeInput),
+    };
     return this.request<WorkflowNode>(`/workflows/${workflowId}/nodes/${nodeId}`, {
       method: 'PUT',
-      body: JSON.stringify(node),
-    })
+      body: JSON.stringify(sanitizedNode),
+    });
   }
 
   async deleteWorkflowNode(workflowId: string, nodeId: string): Promise<void> {
@@ -276,9 +292,15 @@ class ApiService {
 
   async addConnection(workflowId: string, connection: AddConnectionRequest): Promise<{ message: string }> {
     console.log('Adding connection...');
+    // Sanitize user input
+    const sanitizedConnection = {
+      ...connection,
+      label: connection.label ? sanitizeInput(connection.label) : undefined,
+      associationType: sanitizeInput(connection.associationType),
+    };
     return this.request<{ message: string }>(`/workflows/${workflowId}/connections`, {
       method: 'POST',
-      body: JSON.stringify(connection),
+      body: JSON.stringify(sanitizedConnection),
     });
   }
 

@@ -43,7 +43,7 @@ export const TaskNode = (props: NodeProps<NodeData>) => {
         </button>
       </div>
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center space-x-2 text-sm">
+        <CardTitle className="flex items-center space-x-2 text-2xl">
           <button
             className="focus:outline-none"
             onClick={e => {
@@ -59,7 +59,7 @@ export const TaskNode = (props: NodeProps<NodeData>) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-semibold truncate" title={data.config?.userDescription as string || getNodeDescription(data.type || '', data.config || {})}>
+        <p className="text-lg text-gray-600 dark:text-gray-400 mb-1 font-semibold truncate" title={data.config?.userDescription as string || getNodeDescription(data.type || '', data.config || {})}>
           {(data.config?.userDescription as string) || getNodeDescription(data.type || '', data.config || {})}
         </p>
         <div style={{ position: 'absolute', left: -20, top: '50%', transform: 'translateY(-50%)', zIndex: 3, pointerEvents: 'none' }}>
@@ -149,7 +149,7 @@ export const StartingNode = (props: NodeProps<NodeData>) => {
           <Play className="h-16 w-16 text-green-600 group-hover:scale-110 transition-transform duration-150" />
           <span className="mt-2 font-semibold text-lg text-green-700 dark:text-green-300">Start Workflow</span>
         </button>
-        <p className="text-sm text-gray-700 dark:text-gray-300 mt-3 text-center font-medium max-w-[95%] break-words whitespace-pre-line" style={{minHeight: 32}} title={data.config?.userDescription as string || getNodeDescription(data.type || '', data.config || {})}>
+        <p className="text-lg text-gray-700 dark:text-gray-300 mt-3 text-center font-medium max-w-[95%] break-words whitespace-pre-line" style={{minHeight: 32}} title={data.config?.userDescription as string || getNodeDescription(data.type || '', data.config || {})}>
           {(data.config?.userDescription as string) || getNodeDescription(data.type || '', data.config || {})}
         </p>
         <div style={{ position: 'absolute', right: -20, top: '50%', transform: 'translateY(-50%)', zIndex: 3, pointerEvents: 'none' }}>

@@ -7,6 +7,7 @@ using FluentValidation;
 using System.Linq;
 using WorkflowSystem.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using WorkflowSystem.Application.Common.Utils;
 
 namespace WorkflowSystem.Application.Workflows.Commands.AddConnection
 {
@@ -54,8 +55,8 @@ namespace WorkflowSystem.Application.Workflows.Commands.AddConnection
                 WorkflowId = request.WorkflowId,
                 FromTaskId = request.NodeId,
                 ToTaskId = request.TargetNodeId,
-                AssociationType = request.AssociationType ?? string.Empty,
-                Label = request.Label
+                AssociationType = InputSanitizer.Sanitize(request.AssociationType ?? string.Empty),
+                Label = request.Label != null ? InputSanitizer.Sanitize(request.Label) : null
             };
 
             // Add to the context directly (not just to navigation property)

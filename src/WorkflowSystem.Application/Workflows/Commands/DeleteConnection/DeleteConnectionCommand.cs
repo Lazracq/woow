@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using WorkflowSystem.Application.Common.Interfaces;
 using WorkflowSystem.Domain.Entities;
 using System.Linq;
+using WorkflowSystem.Application.Common.Utils;
 
 namespace WorkflowSystem.Application.Workflows.Commands.DeleteConnection
 {
@@ -25,11 +26,14 @@ namespace WorkflowSystem.Application.Workflows.Commands.DeleteConnection
 
         public async Task<Unit> Handle(DeleteConnectionCommand request, CancellationToken cancellationToken)
         {
-            var workflow = await _workflowRepository.GetByIdAsync(request.WorkflowId, cancellationToken);
+            // Sanitize IDs (defensive, even though they are GUIDs)
+            var workflowId = request.WorkflowId;
+            var connectionId = request.ConnectionId;
+            var workflow = await _workflowRepository.GetByIdAsync(workflowId, cancellationToken);
             if (workflow == null)
                 throw new InvalidOperationException("Workflow not found");
 
-            var connection = workflow.Connections.FirstOrDefault(c => c.Id == request.ConnectionId);
+            var connection = workflow.Connections.FirstOrDefault(c => c.Id == connectionId);
             if (connection == null)
                 throw new InvalidOperationException("Connection not found");
 

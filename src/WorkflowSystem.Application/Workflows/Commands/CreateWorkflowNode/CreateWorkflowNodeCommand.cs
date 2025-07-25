@@ -1,6 +1,7 @@
 using MediatR;
 using WorkflowSystem.Application.Common.Interfaces;
 using WorkflowSystem.Domain.Entities;
+using WorkflowSystem.Application.Common.Utils;
 
 namespace WorkflowSystem.Application.Workflows.Commands.CreateWorkflowNode;
 
@@ -52,7 +53,13 @@ public class CreateWorkflowNodeCommandHandler : IRequestHandler<CreateWorkflowNo
         }
 
         // Create the task
-        var task = new WorkflowSystem.Domain.Entities.Task(request.Name, request.Type, request.Configuration, request.PositionX, request.PositionY);
+        var task = new WorkflowSystem.Domain.Entities.Task(
+            InputSanitizer.Sanitize(request.Name),
+            request.Type,
+            InputSanitizer.Sanitize(request.Configuration),
+            request.PositionX,
+            request.PositionY
+        );
         
         // Set active status if different from default
         if (!request.IsActive)

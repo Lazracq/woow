@@ -1,5 +1,6 @@
 using MediatR;
 using WorkflowSystem.Application.Common.Interfaces;
+using WorkflowSystem.Application.Common.Utils;
 
 namespace WorkflowSystem.Application.Workflows.Commands.UpdateWorkflowNode;
 
@@ -60,7 +61,7 @@ public class UpdateWorkflowNodeCommandHandler : IRequestHandler<UpdateWorkflowNo
         // Update name if provided
         if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            task.UpdateName(request.Name);
+            task.UpdateName(InputSanitizer.Sanitize(request.Name));
         }
 
         // Update type if provided
@@ -74,7 +75,7 @@ public class UpdateWorkflowNodeCommandHandler : IRequestHandler<UpdateWorkflowNo
         bool configUpdated = false;
         if (!string.IsNullOrWhiteSpace(request.Configuration))
         {
-            task.UpdateConfiguration(request.Configuration);
+            task.UpdateConfiguration(InputSanitizer.Sanitize(request.Configuration));
             configUpdated = true;
         }
 

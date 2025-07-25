@@ -29,6 +29,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import SelectableEdge from './SelectableEdge';
 
 interface NodeData {
   label: string;
@@ -107,6 +109,8 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
   const studioRef = useRef<HTMLDivElement>(null);
   const [paletteOpen, setPaletteOpen] = useState(true);
   const pendingNodeUpdates = useRef<{ id: string, position: { x: number, y: number } }[]>([]);
+  const { toast } = useToast();
+  const [selectedEdge, setSelectedEdge] = useState<string | null>(null);
 
   // Drag events
   const dragTaskType = useRef<string | null>(null);
@@ -137,21 +141,33 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
           },
         }));
         // Build edges from connections
-        const reactFlowEdges: Edge[] = (workflow.connections || []).map(conn => ({
-          id: conn.id,
-          source: conn.fromTaskId,
-          target: conn.toTaskId,
-          sourceHandle: conn.associationType,
-          type: 'smoothstep',
-          label: conn.label || conn.associationType,
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,
-            height: 20,
-            color: '#10b981',
-          },
-          style: { stroke: '#10b981', strokeWidth: 2 },
-        }));
+        const formatLabel = (label: string) => {
+          if (!label) return '';
+          if (label === 'onFailure') return 'On Failure';
+          if (label === 'onSuccess') return 'On Success';
+          if (label === 'onExecute') return 'On Execute';
+          // Capitalize first letter and add space before capital letters
+          return label.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, s => s.toUpperCase());
+        };
+        const reactFlowEdges: Edge[] = (workflow.connections || []).map(conn => {
+          const rawLabel = conn.label || conn.associationType;
+          const formattedLabel = formatLabel(rawLabel);
+          return {
+            id: conn.id,
+            source: conn.fromTaskId,
+            target: conn.toTaskId,
+            sourceHandle: conn.associationType,
+            type: 'smoothstep',
+            label: formattedLabel,
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: 20,
+              height: 20,
+              color: formattedLabel === 'On Failure' ? '#ef4444' : '#10b981',
+            },
+            style: { stroke: formattedLabel === 'On Failure' ? '#ef4444' : '#10b981', strokeWidth: 2 },
+          };
+        });
         setNodes(reactFlowNodes);
         setEdges(reactFlowEdges);
       } catch (err) {
@@ -494,6 +510,47 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
     if (node) setDeleteNode(node);
   }, [nodes]);
 
+  // Edge removal handler
+  const onEdgesDelete = useCallback(async (edgesToDelete: Edge[]) => {
+    for (const edge of edgesToDelete) {
+      try {
+        await apiService.removeConnection(workflowId, edge.id);
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        toast({
+          title: 'Connection removed',
+          description: 'The connection was successfully removed.',
+          variant: 'success',
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Failed to remove connection',
+          description: error?.message || 'An error occurred while removing the connection.',
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [workflowId, setEdges, toast]);
+
+  // Edge removal handler (for close icon)
+  const handleRemoveEdge = useCallback(async (edgeId: string) => {
+    try {
+      await apiService.removeConnection(workflowId, edgeId);
+      setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+      setSelectedEdge(null);
+      toast({
+        title: 'Connection removed',
+        description: 'The connection was successfully removed.',
+        variant: 'success',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to remove connection',
+        description: error?.message || 'An error occurred while removing the connection.',
+        variant: 'destructive',
+      });
+    }
+  }, [workflowId, setEdges, toast]);
+
   return (
     <>
       {/* Toolbar */}
@@ -567,12 +624,21 @@ export function WorkflowStudio({ workflowId }: WorkflowStudioProps) {
             <NodeHandlerContext.Provider value={{ onEdit: handleEditNode, onDelete: handleDeleteNode }}>
               <ReactFlow
                 nodes={nodes}
-                edges={edges}
+                edges={edges.map(edge => ({
+                  ...edge,
+                  type: 'selectable',
+                  selected: edge.id === selectedEdge,
+                  data: { ...edge.data, label: edge.label, onRemove: handleRemoveEdge },
+                }))}
                 onNodesChange={onNodesChangeCustom}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                onEdgesDelete={onEdgesDelete}
                 onNodeClick={(_, node) => handleEditNode(node.id)}
+                onEdgeClick={(_, edge) => setSelectedEdge(edge.id)}
+                onPaneClick={() => setSelectedEdge(null)}
                 nodeTypes={nodeTypes}
+                edgeTypes={{ selectable: SelectableEdge }}
                 proOptions={{ hideAttribution: true }}
                 fitView
                 attributionPosition="bottom-left"
